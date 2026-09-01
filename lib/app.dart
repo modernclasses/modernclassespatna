@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
-import 'core/routing/app_routes.dart';
 import 'core/routing/route_generator.dart';
 import 'models/user_model.dart';
 import 'providers/auth_provider.dart';

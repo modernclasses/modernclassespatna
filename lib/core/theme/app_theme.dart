@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
-import '../constants/app_spacing.dart';
-import 'app_typography.dart';
 
 export '../constants/app_colors.dart';
 export '../constants/app_spacing.dart';

@@ -14,6 +14,7 @@ void main() async {
     try {
       await Supabase.initialize(
         url: AppConfig.supabaseUrl,
+        // ignore: deprecated_member_use
         anonKey: AppConfig.supabaseAnonKey,
       );
       debugPrint("✅ Connected to Supabase backend: ${AppConfig.supabaseUrl}");

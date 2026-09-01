@@ -10,16 +10,13 @@ class AppException implements Exception {
 }
 
 class ServerException extends AppException {
-  const ServerException([String message = 'Server exception occurred', dynamic details])
-      : super(message, details);
+  const ServerException([super.message = 'Server exception occurred', super.details]);
 }
 
 class AuthException extends AppException {
-  const AuthException([String message = 'Authentication exception occurred', dynamic details])
-      : super(message, details);
+  const AuthException([super.message = 'Authentication exception occurred', super.details]);
 }
 
 class NetworkException extends AppException {
-  const NetworkException([String message = 'Network connection failure', dynamic details])
-      : super(message, details);
+  const NetworkException([super.message = 'Network connection failure', super.details]);
 }
