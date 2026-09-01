@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:modern_classes_patna/main.dart';
+import 'package:modern_classes_patna/app.dart';
 
 void main() {
   testWidgets('Modern Classes Patna App renders Portal Gateway with 3 isolated portals', (WidgetTester tester) async {

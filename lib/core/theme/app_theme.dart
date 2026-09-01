@@ -1,35 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../constants/app_colors.dart';
+import '../constants/app_spacing.dart';
+import 'app_typography.dart';
+
+export '../constants/app_colors.dart';
+export '../constants/app_spacing.dart';
+export 'app_typography.dart';
 
 class AppTheme {
-  // Brand Color Palette
-  static const Color background = Color(0xFF090B10);
-  static const Color surface = Color(0xFF111622);
-  static const Color surfaceLight = Color(0xFF182030);
-  static const Color surfaceCard = Color(0xFF1E283D);
-  static const Color surfaceElevated = Color(0xFF26334D);
+  // Alias references for backward compatibility
+  static const Color background = AppColors.background;
+  static const Color surface = AppColors.surface;
+  static const Color surfaceLight = AppColors.surfaceElevated;
+  static const Color surfaceCard = AppColors.surfaceCard;
+  static const Color surfaceElevated = AppColors.surfaceElevated;
 
-  static const Color border = Color(0xFF2A3752);
-  static const Color borderLight = Color(0xFF3B4D71);
+  static const Color border = AppColors.border;
+  static const Color borderLight = AppColors.borderSubtle;
 
   // Accents
-  static const Color primary = Color(0xFFF59E0B); // Radiant Gold / Amber
-  static const Color primaryLight = Color(0xFFFBBF24);
-  static const Color primaryDark = Color(0xFFD97706);
+  static const Color primary = AppColors.primary;
+  static const Color primaryLight = AppColors.primaryLight;
+  static const Color primaryDark = AppColors.primaryDark;
 
-  static const Color secondary = Color(0xFF3B82F6); // Cobalt Blue
-  static const Color secondaryLight = Color(0xFF60A5FA);
+  static const Color secondary = AppColors.secondary;
+  static const Color secondaryLight = AppColors.secondaryLight;
 
-  static const Color success = Color(0xFF10B981); // Emerald
-  static const Color error = Color(0xFFEF4444); // Crimson
-  static const Color warning = Color(0xFFF97316); // Orange
-  static const Color info = Color(0xFF06B6D4); // Cyan
-  static const Color purple = Color(0xFF8B5CF6); // Royal Violet
+  static const Color success = AppColors.success;
+  static const Color error = AppColors.error;
+  static const Color warning = AppColors.warning;
+  static const Color info = AppColors.info;
+  static const Color purple = AppColors.purple;
 
   // Text Colors
-  static const Color textPrimary = Color(0xFFF8FAFC);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color textMuted = Color(0xFF64748B);
+  static const Color textPrimary = AppColors.textPrimary;
+  static const Color textSecondary = AppColors.textSecondary;
+  static const Color textMuted = AppColors.textMuted;
+
 
   static ThemeData get darkTheme {
     return ThemeData(
