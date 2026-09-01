@@ -49,16 +49,23 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> with SingleTickerPr
 
   void _loginFaculty() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
 
     final auth = context.read<AuthProvider>();
-    auth.loginTeacher(
+    final success = await auth.loginTeacher(
       staffId: _teacherIdCtrl.text.trim(),
       password: _teacherPassCtrl.text.trim(),
     );
 
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else if (auth.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.errorMessage!)),
+      );
+    }
   }
 
   void _loginAdmin() async {

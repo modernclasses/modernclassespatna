@@ -9,22 +9,22 @@ import 'package:modern_classes_patna/data/mock_data.dart';
 
 void main() {
   group('Modern Classes Patna - Role-Isolated Auth & Operations', () {
-    test('AuthProvider enforces role-isolated authentication and master admin PIN', () {
+    test('AuthProvider enforces role-isolated authentication and master admin PIN', () async {
       final auth = AuthProvider();
       expect(auth.isAuthenticated, isFalse);
 
       // Student login
-      auth.loginStudent(phone: "9876543210");
+      await auth.loginStudent(phoneOrEmail: "9876543210");
       expect(auth.isAuthenticated, isTrue);
       expect(auth.isStudent, isTrue);
       expect(auth.currentUser.name, "Rohan Kumar");
 
       // Logout
-      auth.logout();
+      await auth.logout();
       expect(auth.isAuthenticated, isFalse);
 
       // Student registration
-      auth.registerStudent(
+      await auth.registerStudent(
         name: "Pooja Kumari",
         phone: "9876500001",
         email: "pooja@gmail.com",
@@ -36,17 +36,17 @@ void main() {
       expect(auth.currentUser.role, UserRole.student);
 
       // Logout
-      auth.logout();
+      await auth.logout();
       expect(auth.isAuthenticated, isFalse);
 
       // Faculty login
-      final teacherSuccess = auth.loginTeacher(staffId: "tch_001", password: "password123");
+      final teacherSuccess = await auth.loginTeacher(staffId: "tch_001", password: "password123");
       expect(teacherSuccess, isTrue);
       expect(auth.isTeacher, isTrue);
       expect(auth.currentUser.name, "Madhurendra Kumar Yadav");
 
       // Logout
-      auth.logout();
+      await auth.logout();
       expect(auth.isAuthenticated, isFalse);
 
       // Admin login with invalid PIN fails

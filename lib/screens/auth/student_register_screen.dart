@@ -53,12 +53,8 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen> {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    if (!mounted) return;
-
     final auth = context.read<AuthProvider>();
-    auth.registerStudent(
+    final success = await auth.registerStudent(
       name: _nameCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
       email: _emailCtrl.text.trim().isNotEmpty
@@ -68,8 +64,18 @@ class _StudentRegisterScreenState extends State<StudentRegisterScreen> {
       medium: _selectedMedium,
     );
 
-    // Pop back to root gate
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else if (auth.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.errorMessage!)),
+      );
+    }
   }
 
   @override

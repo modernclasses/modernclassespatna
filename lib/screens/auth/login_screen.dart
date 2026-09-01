@@ -40,14 +40,24 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    final auth = context.read<AuthProvider>();
+    final success = await auth.loginStudent(
+      phoneOrEmail: phone,
+      password: _passCtrl.text.trim(),
+    );
 
     if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+    });
 
-    final auth = context.read<AuthProvider>();
-    auth.loginStudent(phone: phone, password: _passCtrl.text.trim());
-
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    if (success) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else if (auth.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.errorMessage!)),
+      );
+    }
   }
 
   @override
