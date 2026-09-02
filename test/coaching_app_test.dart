@@ -1,14 +1,27 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:modern_classes_patna/core/config/app_config.dart';
+import 'package:modern_classes_patna/core/routing/app_routes.dart';
+import 'package:modern_classes_patna/core/routing/route_generator.dart';
 import 'package:modern_classes_patna/models/user_model.dart';
 import 'package:modern_classes_patna/providers/auth_provider.dart';
 import 'package:modern_classes_patna/providers/course_provider.dart';
+import 'package:modern_classes_patna/providers/live_class_provider.dart';
 import 'package:modern_classes_patna/providers/test_provider.dart';
+import 'package:modern_classes_patna/providers/study_material_provider.dart';
+import 'package:modern_classes_patna/providers/doubt_provider.dart';
 import 'package:modern_classes_patna/providers/attendance_provider.dart';
 import 'package:modern_classes_patna/providers/notification_provider.dart';
 import 'package:modern_classes_patna/data/mock_data.dart';
 
 void main() {
-  group('Modern Classes Patna - Role-Isolated Auth & Operations', () {
+  group('Modern Classes Patna - Full Platform Domain Suite', () {
+    test('AppConfig initializes with default safe fallback values', () {
+      expect(AppConfig.appName, "Modern Classes Patna");
+      expect(AppConfig.appVersion, "1.0.0");
+      expect(AppConfig.supportEmail, "support@modernclassespatna.com");
+    });
+
     test('AuthProvider enforces role-isolated authentication and master admin PIN', () async {
       final auth = AuthProvider();
       expect(auth.isAuthenticated, isFalse);
@@ -86,6 +99,25 @@ void main() {
       expect(courseProvider.transactions.first.id, txn.id);
     });
 
+    test('LiveClassProvider handles live stream state and real-time chat messages', () {
+      final liveProvider = LiveClassProvider();
+      expect(liveProvider.classes, isNotEmpty);
+
+      final liveClass = liveProvider.classes.first;
+      final initialMessages = liveClass.chatMessages.length;
+
+      liveProvider.sendLiveChatMessage(
+        classId: liveClass.id,
+        senderName: "Rohan Kumar",
+        text: "Sir, will the recording be uploaded tonight?",
+      );
+
+      final updatedClass = liveProvider.getLiveClassById(liveClass.id);
+      expect(updatedClass, isNotNull);
+      expect(updatedClass!.chatMessages.length, initialMessages + 1);
+      expect(updatedClass.chatMessages.last.text, "Sir, will the recording be uploaded tonight?");
+    });
+
     test('TestProvider executes timed test, auto-grading, and calculates ranks', () {
       final testProvider = TestProvider();
       final test = MockData.tests.first;
@@ -115,6 +147,49 @@ void main() {
       expect(testProvider.activeTest, isNull);
     });
 
+    test('StudyMaterialProvider filters documents by subject and batch', () {
+      final smProvider = StudyMaterialProvider();
+      expect(smProvider.materials, isNotEmpty);
+
+      smProvider.setSelectedSubject('History');
+      for (var m in smProvider.filteredMaterials) {
+        expect(m.subject, 'History');
+      }
+
+      smProvider.setSelectedSubject('All');
+      expect(smProvider.filteredMaterials.length, smProvider.materials.length);
+    });
+
+    test('DoubtProvider supports student queries, filtering, and faculty answers', () {
+      final doubtProvider = DoubtProvider();
+      final initialCount = doubtProvider.doubts.length;
+
+      doubtProvider.askNewDoubt(
+        studentId: "std_001",
+        studentName: "Rohan Kumar",
+        subject: "Bihar Special GK",
+        topic: "Champaran Satyagraha 1917",
+        questionText: "Who invited Mahatma Gandhi to Champaran?",
+      );
+
+      expect(doubtProvider.doubts.length, initialCount + 1);
+      final newDoubt = doubtProvider.doubts.first;
+      expect(newDoubt.isResolved, isFalse);
+
+      doubtProvider.replyToDoubt(
+        doubtId: newDoubt.id,
+        authorId: "tch_001",
+        authorName: "Madhurendra Kumar Yadav",
+        authorRole: "Teacher",
+        message: "Pandit Raj Kumar Shukla invited Gandhiji.",
+        isOfficialTeacherAnswer: true,
+      );
+
+      final answeredDoubt = doubtProvider.doubts.firstWhere((d) => d.id == newDoubt.id);
+      expect(answeredDoubt.isResolved, isTrue);
+      expect(answeredDoubt.replies.first.isOfficialTeacherAnswer, isTrue);
+    });
+
     test('AttendanceProvider calculates attendance percentage accurately', () {
       final attProvider = AttendanceProvider();
       final percentage = attProvider.calculateAttendancePercentage("std_001");
@@ -137,6 +212,28 @@ void main() {
       final firstId = notifProvider.notifications.first.id;
       notifProvider.markAsRead(firstId);
       expect(notifProvider.notifications.first.isRead, isTrue);
+    });
+
+    test('RouteGenerator generates valid routes for all top-level entrypoints', () {
+      final gatewayRoute = RouteGenerator.generateRoute(
+        const RouteSettings(name: AppRoutes.gateway),
+      );
+      expect(gatewayRoute, isA<MaterialPageRoute>());
+
+      final studentMainRoute = RouteGenerator.generateRoute(
+        const RouteSettings(name: AppRoutes.studentMain),
+      );
+      expect(studentMainRoute, isA<MaterialPageRoute>());
+
+      final teacherMainRoute = RouteGenerator.generateRoute(
+        const RouteSettings(name: AppRoutes.teacherMain),
+      );
+      expect(teacherMainRoute, isA<MaterialPageRoute>());
+
+      final adminMainRoute = RouteGenerator.generateRoute(
+        const RouteSettings(name: AppRoutes.adminMain),
+      );
+      expect(adminMainRoute, isA<MaterialPageRoute>());
     });
   });
 }
