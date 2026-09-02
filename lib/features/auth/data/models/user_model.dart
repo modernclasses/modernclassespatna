@@ -11,10 +11,11 @@ class UserModel {
   final List<String> enrolledBatchIds;
   final List<String> enrolledCourseIds;
   final List<String> assignedBatchIds; // For teachers
-  final DateTime joinedDate;
+  final DateTime? joinedDate;
   final String? bio;
   final String targetExam;
   final String medium;
+  final bool isActive;
 
   const UserModel({
     required this.id,
@@ -26,11 +27,20 @@ class UserModel {
     this.enrolledBatchIds = const [],
     this.enrolledCourseIds = const [],
     this.assignedBatchIds = const [],
-    required this.joinedDate,
+    this.joinedDate,
     this.bio,
     this.targetExam = "BPSC 71st Civil Services",
     this.medium = "Bilingual (Hindi + English)",
+    this.isActive = true,
   });
+
+  static const UserModel guest = UserModel(
+    id: '',
+    name: 'Guest Aspirant',
+    email: '',
+    phone: '',
+    role: UserRole.student,
+  );
 
   /// Factory constructor to deserialize from Supabase `public.profiles` row.
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -57,9 +67,10 @@ class UserModel {
       bio: map['bio'],
       targetExam: map['target_exam'] ?? 'BPSC 71st Civil Services',
       medium: map['medium'] ?? 'Bilingual (Hindi + English)',
+      isActive: map['is_active'] ?? true,
       joinedDate: map['created_at'] != null
-          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+          ? DateTime.tryParse(map['created_at'].toString())
+          : null,
     );
   }
 
@@ -75,6 +86,7 @@ class UserModel {
       'bio': bio,
       'target_exam': targetExam,
       'medium': medium,
+      'is_active': isActive,
     };
   }
 
@@ -92,6 +104,7 @@ class UserModel {
     String? bio,
     String? targetExam,
     String? medium,
+    bool? isActive,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -107,6 +120,7 @@ class UserModel {
       bio: bio ?? this.bio,
       targetExam: targetExam ?? this.targetExam,
       medium: medium ?? this.medium,
+      isActive: isActive ?? this.isActive,
     );
   }
 }

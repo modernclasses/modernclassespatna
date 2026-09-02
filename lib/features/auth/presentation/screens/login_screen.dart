@@ -15,10 +15,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneCtrl = TextEditingController(text: "9876543210");
-  final TextEditingController _passCtrl = TextEditingController(text: "••••••••");
+  final TextEditingController _phoneCtrl = TextEditingController();
+  final TextEditingController _passCtrl = TextEditingController();
   bool _isOtpMode = false;
   bool _isLoading = false;
+  bool _obscurePass = true;
 
   @override
   void dispose() {
@@ -28,10 +29,19 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _loginStudent() async {
-    final phone = _phoneCtrl.text.trim();
-    if (phone.isEmpty) {
+    final phoneOrEmail = _phoneCtrl.text.trim();
+    final password = _passCtrl.text.trim();
+
+    if (phoneOrEmail.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter your mobile number or email")),
+        const SnackBar(content: Text("Please enter your registered mobile number or email")),
+      );
+      return;
+    }
+
+    if (!_isOtpMode && password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your password")),
       );
       return;
     }
@@ -42,8 +52,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final auth = context.read<AuthProvider>();
     final success = await auth.loginStudent(
-      phoneOrEmail: phone,
-      password: _passCtrl.text.trim(),
+      phoneOrEmail: phoneOrEmail,
+      password: password,
     );
 
     if (!mounted) return;
@@ -53,9 +63,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success) {
       Navigator.of(context).popUntil((route) => route.isFirst);
-    } else if (auth.errorMessage != null) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.errorMessage!)),
+        SnackBar(
+          content: Text(auth.errorMessage ?? "Invalid login credentials. Please try again."),
+          backgroundColor: AppTheme.error,
+        ),
       );
     }
   }
@@ -119,10 +132,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (!_isOtpMode) ...[
                           TextField(
                             controller: _passCtrl,
-                            obscureText: true,
-                            decoration: const InputDecoration(
+                            obscureText: _obscurePass,
+                            decoration: InputDecoration(
                               labelText: "Password",
-                              prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                              prefixIcon: const Icon(Icons.lock_outline, size: 20, color: AppTheme.primary),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePass ? Icons.visibility_off : Icons.visibility,
+                                  size: 20,
+                                  color: AppTheme.textSecondary,
+                                ),
+                                onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                              ),
                             ),
                           ),
                         ] else ...[

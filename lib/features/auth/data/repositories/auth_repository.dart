@@ -18,12 +18,16 @@ abstract class AuthRepository {
     required String phoneOrEmail,
     String? password,
   });
-  Future<UserModel> loginTeacher({
-    required String staffId,
+  Future<UserModel> loginStaff({
+    required String email,
     required String password,
   });
   Future<void> logout();
   Future<UserModel> updateProfile(UserModel user);
+  Future<void> adminSetUserRole({
+    required String targetUserId,
+    required String newRole,
+  });
 }
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -92,17 +96,13 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<UserModel> loginTeacher({
-    required String staffId,
+  Future<UserModel> loginStaff({
+    required String email,
     required String password,
   }) async {
     try {
-      final formattedEmail = staffId.contains('@')
-          ? staffId.trim()
-          : "${staffId.trim()}@faculty.modernclasses.com";
-
       return await _remoteDataSource.signIn(
-        email: formattedEmail,
+        email: email.trim(),
         password: password,
       );
     } catch (e) {
@@ -123,6 +123,21 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<UserModel> updateProfile(UserModel user) async {
     try {
       return await _remoteDataSource.updateProfile(user);
+    } catch (e) {
+      throw ErrorHandler.handle(e);
+    }
+  }
+
+  @override
+  Future<void> adminSetUserRole({
+    required String targetUserId,
+    required String newRole,
+  }) async {
+    try {
+      await _remoteDataSource.adminSetUserRole(
+        targetUserId: targetUserId,
+        newRole: newRole,
+      );
     } catch (e) {
       throw ErrorHandler.handle(e);
     }

@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide AuthException;
 import '../../../../core/config/app_config.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../models/user_model.dart';
-import '../../../../data/mock_data.dart';
 
 abstract class AuthRemoteDataSource {
   bool get isConnected;
@@ -24,6 +23,10 @@ abstract class AuthRemoteDataSource {
   });
   Future<void> signOut();
   Future<UserModel> updateProfile(UserModel updatedUser);
+  Future<void> adminSetUserRole({
+    required String targetUserId,
+    required String newRole,
+  });
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -48,9 +51,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel?> getCurrentProfile() async {
     final client = _supabase;
-    final authUser = client?.auth.currentUser;
+    if (client == null) {
+      throw const ServerException('Backend service is not configured.');
+    }
 
-    if (client == null || authUser == null) {
+    final authUser = client.auth.currentUser;
+    if (authUser == null) {
       return null;
     }
 
@@ -63,22 +69,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       if (response != null) {
         return UserModel.fromMap(response);
-      } else {
-        // Fallback: Create initial profile record if trigger didn't fire
-        final newProfile = UserModel(
-          id: authUser.id,
-          name: authUser.userMetadata?['full_name'] ?? 'Student Aspirant',
-          email: authUser.email ?? '',
-          phone: authUser.userMetadata?['phone'] ?? '',
-          role: UserRole.student,
-          joinedDate: DateTime.now(),
-        );
-        await client.from('profiles').upsert(newProfile.toMap());
-        return newProfile;
       }
+      return null;
     } catch (e) {
-      debugPrint('Error fetching Supabase user profile: $e');
-      throw ServerException('Failed to fetch profile from cloud database', e);
+      debugPrint('Error fetching user profile from Supabase: $e');
+      throw ServerException('Failed to load user profile from database', e);
     }
   }
 
@@ -92,51 +87,46 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String medium = "Bilingual (Hindi + English)",
   }) async {
     final client = _supabase;
-
     if (client == null) {
-      // Mock Fallback
-      return UserModel(
-        id: "mock-${DateTime.now().millisecondsSinceEpoch}",
-        name: fullName,
-        email: email,
-        phone: phone ?? "9876543210",
-        role: UserRole.student,
-        targetExam: targetExam,
-        medium: medium,
-        joinedDate: DateTime.now(),
-      );
+      throw const ServerException('Backend service is not configured.');
     }
 
     try {
       final authRes = await client.auth.signUp(
-        email: email,
+        email: email.trim().toLowerCase(),
         password: password,
         data: {
-          'full_name': fullName,
-          'phone': phone,
-          'role': 'student',
+          'full_name': fullName.trim(),
+          'phone': phone?.trim(),
           'target_exam': targetExam,
           'medium': medium,
         },
       );
 
       if (authRes.user == null) {
-        throw const AuthException('Failed to create account. Please check credentials.');
+        throw const AuthException('Failed to create account. Please check your details.');
       }
 
-      final profile = UserModel(
-        id: authRes.user!.id,
-        name: fullName,
-        email: email,
-        phone: phone ?? '',
-        role: UserRole.student,
-        targetExam: targetExam,
-        medium: medium,
-        joinedDate: DateTime.now(),
-      );
+      // Fetch the trigger-created profile from public.profiles
+      // Retry up to 3 times to allow trigger execution
+      UserModel? profile;
+      for (int i = 0; i < 3; i++) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        profile = await getCurrentProfile();
+        if (profile != null) break;
+      }
 
-      await client.from('profiles').upsert(profile.toMap());
-      return profile;
+      return profile ??
+          UserModel(
+            id: authRes.user!.id,
+            name: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            phone: phone?.trim() ?? '',
+            role: UserRole.student,
+            targetExam: targetExam,
+            medium: medium,
+            joinedDate: DateTime.now(),
+          );
     } catch (e) {
       if (e is AppException) rethrow;
       throw AuthException(e.toString().replaceAll('Exception:', '').trim());
@@ -149,27 +139,28 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String password,
   }) async {
     final client = _supabase;
-
     if (client == null) {
-      // Mock Fallback if Supabase not configured
-      if (email.contains('admin')) return MockData.adminUser;
-      if (email.contains('teacher') || email.contains('faculty') || email.contains('tch')) return MockData.teacherUser;
-      return MockData.currentStudent;
+      throw const ServerException('Backend service is not configured.');
     }
 
     try {
       final authRes = await client.auth.signInWithPassword(
-        email: email,
+        email: email.trim().toLowerCase(),
         password: password,
       );
 
       if (authRes.user == null) {
-        throw const AuthException('Invalid login credentials.');
+        throw const AuthException('Invalid email or password.');
       }
 
       final profile = await getCurrentProfile();
       if (profile == null) {
-        throw const AuthException('User profile not found. Please contact administration.');
+        throw const AuthException('User profile not found. Please contact institute administration.');
+      }
+
+      if (!profile.isActive) {
+        await client.auth.signOut();
+        throw const AuthException('Your account has been deactivated. Please contact administration.');
       }
 
       return profile;
@@ -194,16 +185,44 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<UserModel> updateProfile(UserModel updatedUser) async {
     final client = _supabase;
-    if (client != null) {
-      try {
-        await client
-            .from('profiles')
-            .update(updatedUser.toMap())
-            .eq('id', updatedUser.id);
-      } catch (e) {
-        throw ServerException('Failed to update profile details', e);
-      }
+    if (client == null) {
+      throw const ServerException('Backend service is not configured.');
     }
-    return updatedUser;
+
+    try {
+      // Send only safe, allowed fields to profiles table
+      await client.from('profiles').update({
+        'full_name': updatedUser.name,
+        'phone': updatedUser.phone,
+        'bio': updatedUser.bio,
+        'avatar_url': updatedUser.avatarUrl,
+        'target_exam': updatedUser.targetExam,
+        'medium': updatedUser.medium,
+      }).eq('id', updatedUser.id);
+
+      return updatedUser;
+    } catch (e) {
+      throw ServerException('Failed to update profile details', e);
+    }
+  }
+
+  @override
+  Future<void> adminSetUserRole({
+    required String targetUserId,
+    required String newRole,
+  }) async {
+    final client = _supabase;
+    if (client == null) {
+      throw const ServerException('Backend service is not configured.');
+    }
+
+    try {
+      await client.rpc('admin_set_user_role', params: {
+        'target_user_id': targetUserId,
+        'new_role': newRole,
+      });
+    } catch (e) {
+      throw ServerException('Failed to assign user role via server RPC', e);
+    }
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:modern_classes_patna/core/config/app_config.dart';
 import 'package:modern_classes_patna/core/routing/app_routes.dart';
 import 'package:modern_classes_patna/core/routing/route_generator.dart';
+import 'package:modern_classes_patna/features/auth/data/repositories/auth_repository.dart';
 import 'package:modern_classes_patna/models/user_model.dart';
 import 'package:modern_classes_patna/providers/auth_provider.dart';
 import 'package:modern_classes_patna/providers/course_provider.dart';
@@ -14,6 +15,125 @@ import 'package:modern_classes_patna/providers/attendance_provider.dart';
 import 'package:modern_classes_patna/providers/notification_provider.dart';
 import 'package:modern_classes_patna/data/mock_data.dart';
 
+/// Test Mock Auth Repository simulating real backend validation
+class TestAuthRepository implements AuthRepository {
+  final Map<String, UserModel> _users = {
+    'student@test.com': const UserModel(
+      id: 'std_001',
+      name: 'Rohan Kumar',
+      email: 'student@test.com',
+      phone: '9876543210',
+      role: UserRole.student,
+    ),
+    'faculty@test.com': const UserModel(
+      id: 'tch_001',
+      name: 'Madhurendra Kumar Yadav',
+      email: 'faculty@test.com',
+      phone: '9876543211',
+      role: UserRole.teacher,
+    ),
+    'admin@test.com': const UserModel(
+      id: 'adm_001',
+      name: 'Modern Classes Admin',
+      email: 'admin@test.com',
+      phone: '9876543212',
+      role: UserRole.admin,
+    ),
+  };
+
+  UserModel? _sessionUser;
+
+  @override
+  bool get isConnected => true;
+
+  @override
+  Future<UserModel?> getInitialSession() async => _sessionUser;
+
+  @override
+  Future<UserModel> registerStudent({
+    required String name,
+    required String phone,
+    required String email,
+    String? password,
+    required String targetExam,
+    required String medium,
+  }) async {
+    final newUser = UserModel(
+      id: "std_${DateTime.now().millisecondsSinceEpoch}",
+      name: name,
+      email: email,
+      phone: phone,
+      role: UserRole.student,
+      targetExam: targetExam,
+      medium: medium,
+    );
+    _users[email] = newUser;
+    _sessionUser = newUser;
+    return newUser;
+  }
+
+  @override
+  Future<UserModel> loginStudent({
+    required String phoneOrEmail,
+    String? password,
+  }) async {
+    if (password != "correct_password") {
+      throw Exception("Invalid login credentials.");
+    }
+    final user = _users.values.firstWhere(
+      (u) => u.email == phoneOrEmail || u.phone == phoneOrEmail,
+      orElse: () => throw Exception("User not found."),
+    );
+    _sessionUser = user;
+    return user;
+  }
+
+  @override
+  Future<UserModel> loginStaff({
+    required String email,
+    required String password,
+  }) async {
+    if (password != "correct_password") {
+      throw Exception("Invalid login credentials.");
+    }
+    final user = _users[email];
+    if (user == null) {
+      throw Exception("Staff account not found.");
+    }
+    _sessionUser = user;
+    return user;
+  }
+
+  @override
+  Future<void> logout() async {
+    _sessionUser = null;
+  }
+
+  @override
+  Future<UserModel> updateProfile(UserModel user) async {
+    _users[user.email] = user;
+    _sessionUser = user;
+    return user;
+  }
+
+  @override
+  Future<void> adminSetUserRole({
+    required String targetUserId,
+    required String newRole,
+  }) async {
+    final target = _users.values.firstWhere(
+      (u) => u.id == targetUserId,
+      orElse: () => throw Exception("Target user not found."),
+    );
+    final updated = target.copyWith(
+      role: newRole == 'admin'
+          ? UserRole.admin
+          : (newRole == 'teacher' ? UserRole.teacher : UserRole.student),
+    );
+    _users[target.email] = updated;
+  }
+}
+
 void main() {
   group('Modern Classes Patna - Full Platform Domain Suite', () {
     test('AppConfig initializes with default safe fallback values', () {
@@ -22,56 +142,65 @@ void main() {
       expect(AppConfig.supportEmail, "support@modernclassespatna.com");
     });
 
-    test('AuthProvider enforces role-isolated authentication and master admin PIN', () async {
-      final auth = AuthProvider();
+    test('AuthProvider enforces genuine Supabase auth & server-side role gating', () async {
+      final repo = TestAuthRepository();
+      final auth = AuthProvider(repository: repo);
       expect(auth.isAuthenticated, isFalse);
 
-      // Student login
-      await auth.loginStudent(phoneOrEmail: "9876543210");
+      // 1. Wrong student password strictly fails and leaves user unauthenticated
+      final badLogin = await auth.loginStudent(phoneOrEmail: "student@test.com", password: "wrong_password");
+      expect(badLogin, isFalse);
+      expect(auth.isAuthenticated, isFalse);
+      expect(auth.currentUser.id, isEmpty);
+      expect(auth.errorMessage, contains("Invalid login credentials"));
+
+      // 2. Correct student login succeeds
+      final goodLogin = await auth.loginStudent(phoneOrEmail: "student@test.com", password: "correct_password");
+      expect(goodLogin, isTrue);
       expect(auth.isAuthenticated, isTrue);
       expect(auth.isStudent, isTrue);
       expect(auth.currentUser.name, "Rohan Kumar");
 
-      // Logout
+      // 3. Logout clears state completely
       await auth.logout();
       expect(auth.isAuthenticated, isFalse);
+      expect(auth.currentUser.id, isEmpty);
 
-      // Student registration
-      await auth.registerStudent(
-        name: "Pooja Kumari",
-        phone: "9876500001",
-        email: "pooja@gmail.com",
-        targetExam: "BPSC 71st",
-        medium: "Hindi",
+      // 4. Student attempting to log into Admin Portal is rejected server-side
+      final studentAdminAttempt = await auth.loginStaff(
+        email: "student@test.com",
+        password: "correct_password",
+        expectedRole: UserRole.admin,
       );
-      expect(auth.isAuthenticated, isTrue);
-      expect(auth.currentUser.name, "Pooja Kumari");
-      expect(auth.currentUser.role, UserRole.student);
-
-      // Logout
-      await auth.logout();
+      expect(studentAdminAttempt, isFalse);
       expect(auth.isAuthenticated, isFalse);
+      expect(auth.errorMessage, contains("Access Denied"));
 
-      // Faculty login
-      final teacherSuccess = await auth.loginTeacher(staffId: "tch_001", password: "password123");
-      expect(teacherSuccess, isTrue);
+      // 5. Genuine Faculty Login succeeds
+      final teacherLogin = await auth.loginStaff(
+        email: "faculty@test.com",
+        password: "correct_password",
+        expectedRole: UserRole.teacher,
+      );
+      expect(teacherLogin, isTrue);
       expect(auth.isTeacher, isTrue);
       expect(auth.currentUser.name, "Madhurendra Kumar Yadav");
 
-      // Logout
       await auth.logout();
-      expect(auth.isAuthenticated, isFalse);
 
-      // Admin login with invalid PIN fails
-      final adminFail = auth.loginAdmin(adminId: "admin@modernclasses.com", securityPin: "0000");
-      expect(adminFail, isFalse);
-      expect(auth.isAuthenticated, isFalse);
-
-      // Admin login with valid 6-digit Master PIN succeeds
-      final adminSuccess = auth.loginAdmin(adminId: "admin@modernclasses.com", securityPin: "123456");
-      expect(adminSuccess, isTrue);
+      // 6. Genuine Admin Login succeeds
+      final adminLogin = await auth.loginStaff(
+        email: "admin@test.com",
+        password: "correct_password",
+        expectedRole: UserRole.admin,
+      );
+      expect(adminLogin, isTrue);
       expect(auth.isAdmin, isTrue);
       expect(auth.currentUser.name, "Modern Classes Admin");
+
+      // 7. Admin successfully assigns teacher role via server-side RPC
+      final roleAssigned = await auth.adminSetUserRole(targetUserId: "std_001", newRole: UserRole.teacher);
+      expect(roleAssigned, isTrue);
     });
 
     test('CourseProvider applies coupon discount correctly and generates invoice', () {

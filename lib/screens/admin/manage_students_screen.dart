@@ -111,7 +111,7 @@ class _ManageStudentsScreenState extends State<ManageStudentsScreen> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  "Joined ${Formatters.formatDate(student.joinedDate)}",
+                                  "Joined ${Formatters.formatDate(student.joinedDate ?? DateTime.now())}",
                                   style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
                                 ),
                               ],

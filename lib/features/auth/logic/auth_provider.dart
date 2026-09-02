@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
-import '../../../../data/mock_data.dart';
 import '../data/models/user_model.dart';
 import '../data/repositories/auth_repository.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repository;
 
-  UserModel _currentUser = MockData.currentStudent;
+  UserModel? _currentUser;
   bool _isAuthenticated = false;
   bool _isLoading = false;
   String? _errorMessage;
 
-  UserModel get currentUser => _currentUser;
-  bool get isAuthenticated => _isAuthenticated;
+  UserModel get currentUser => _currentUser ?? UserModel.guest;
+  bool get isAuthenticated => _isAuthenticated && _currentUser != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  UserRole get currentRole => _currentUser.role;
-  bool get isStudent => _currentUser.role == UserRole.student;
-  bool get isTeacher => _currentUser.role == UserRole.teacher;
-  bool get isAdmin => _currentUser.role == UserRole.admin;
+  UserRole get currentRole => _currentUser?.role ?? UserRole.student;
+  bool get isStudent => _currentUser?.role == UserRole.student;
+  bool get isTeacher => _currentUser?.role == UserRole.teacher;
+  bool get isAdmin => _currentUser?.role == UserRole.admin;
 
   AuthProvider({AuthRepository? repository})
       : _repository = repository ?? AuthRepositoryImpl() {
@@ -30,15 +29,28 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _initializeSession() async {
     if (!_repository.isConnected) return;
 
-    final profile = await _repository.getInitialSession();
-    if (profile != null) {
-      _currentUser = profile;
-      _isAuthenticated = true;
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final profile = await _repository.getInitialSession();
+      if (profile != null) {
+        _currentUser = profile;
+        _isAuthenticated = true;
+      } else {
+        _currentUser = null;
+        _isAuthenticated = false;
+      }
+    } catch (_) {
+      _currentUser = null;
+      _isAuthenticated = false;
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Student Registration via Supabase or Local Mock
+  /// Student Registration via Supabase Auth
   Future<bool> registerStudent({
     required String name,
     required String phone,
@@ -67,7 +79,9 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      _currentUser = null;
+      _isAuthenticated = false;
       _isLoading = false;
       notifyListeners();
       return false;
@@ -95,101 +109,116 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      // Fallback to local mock if offline or credentials mismatch
-      UserModel? matchedStudent;
-      try {
-        matchedStudent = MockData.allStudents.firstWhere(
-          (s) => s.phone == phoneOrEmail || s.email.toLowerCase() == phoneOrEmail.toLowerCase(),
-        );
-      } catch (_) {
-        matchedStudent = MockData.currentStudent;
-      }
-
-      _currentUser = matchedStudent;
-      _isAuthenticated = true;
+      _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      _currentUser = null;
+      _isAuthenticated = false;
       _isLoading = false;
       notifyListeners();
-      return true;
+      return false;
     }
   }
 
-  /// Faculty Login
-  Future<bool> loginTeacher({
-    required String staffId,
+  /// Staff (Faculty / Administrator) Sign In with Server-Enforced Role Check
+  Future<bool> loginStaff({
+    required String email,
     required String password,
+    required UserRole expectedRole,
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final user = await _repository.loginTeacher(
-        staffId: staffId,
+      final user = await _repository.loginStaff(
+        email: email,
         password: password,
       );
 
-      _currentUser = user.copyWith(role: UserRole.teacher);
+      // Verify that user possesses the required staff role on the backend
+      if (expectedRole == UserRole.admin && user.role != UserRole.admin) {
+        await _repository.logout();
+        _currentUser = null;
+        _isAuthenticated = false;
+        _errorMessage = "Access Denied: This account does not possess Administrator privileges.";
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      if (expectedRole == UserRole.teacher &&
+          user.role != UserRole.teacher &&
+          user.role != UserRole.admin) {
+        await _repository.logout();
+        _currentUser = null;
+        _isAuthenticated = false;
+        _errorMessage = "Access Denied: This account is not registered as Faculty.";
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      _currentUser = user;
       _isAuthenticated = true;
       _isLoading = false;
       notifyListeners();
       return true;
-    } catch (_) {
-      // Fallback demo faculty login
-      _currentUser = MockData.teacherUser;
-      _isAuthenticated = true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      _currentUser = null;
+      _isAuthenticated = false;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Administrator Role Assignment RPC
+  Future<bool> adminSetUserRole({
+    required String targetUserId,
+    required UserRole newRole,
+  }) async {
+    if (!isAdmin) {
+      _errorMessage = "Unauthorized: Only administrators can assign roles.";
+      notifyListeners();
+      return false;
+    }
+
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.adminSetUserRole(
+        targetUserId: targetUserId,
+        newRole: newRole.name,
+      );
       _isLoading = false;
       notifyListeners();
       return true;
-    }
-  }
-
-  /// Master Admin PIN Login
-  bool loginAdmin({required String adminId, required String securityPin}) {
-    if (securityPin.trim() == "123456" || securityPin.trim() == "000000") {
-      _currentUser = MockData.adminUser;
-      _isAuthenticated = true;
-      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      _isLoading = false;
       notifyListeners();
-      return true;
+      return false;
     }
-    _errorMessage = "Invalid Master Security PIN. Please enter the authorized 6-digit PIN.";
-    notifyListeners();
-    return false;
-  }
-
-  /// Switch user role (demo & testing utility)
-  void switchRole(UserRole role) {
-    switch (role) {
-      case UserRole.student:
-        _currentUser = MockData.currentStudent;
-        break;
-      case UserRole.teacher:
-        _currentUser = MockData.teacherUser;
-        break;
-      case UserRole.admin:
-        _currentUser = MockData.adminUser;
-        break;
-    }
-    _isAuthenticated = true;
-    notifyListeners();
   }
 
   /// Logout
   Future<void> logout() async {
     try {
       await _repository.logout();
-    } catch (_) {
-      // Ignore logout errors
-    }
+    } catch (_) {}
     _isAuthenticated = false;
-    _currentUser = MockData.currentStudent;
+    _currentUser = null;
     _errorMessage = null;
     notifyListeners();
   }
 
   /// Update Profile Details
   Future<void> updateProfile({required String name, required String phone, String? bio}) async {
-    final updated = _currentUser.copyWith(
+    if (_currentUser == null) return;
+
+    final updated = _currentUser!.copyWith(
       name: name,
       phone: phone,
       bio: bio,
@@ -201,18 +230,20 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Enroll in Batch
+  /// Enroll in Batch (updates local session lists for active UI)
   void enrollInBatch(String courseId, String batchId) {
-    final updatedCourses = List<String>.from(_currentUser.enrolledCourseIds);
+    if (_currentUser == null) return;
+
+    final updatedCourses = List<String>.from(_currentUser!.enrolledCourseIds);
     if (!updatedCourses.contains(courseId)) {
       updatedCourses.add(courseId);
     }
-    final updatedBatches = List<String>.from(_currentUser.enrolledBatchIds);
+    final updatedBatches = List<String>.from(_currentUser!.enrolledBatchIds);
     if (!updatedBatches.contains(batchId)) {
       updatedBatches.add(batchId);
     }
 
-    _currentUser = _currentUser.copyWith(
+    _currentUser = _currentUser!.copyWith(
       enrolledCourseIds: updatedCourses,
       enrolledBatchIds: updatedBatches,
     );

@@ -5,6 +5,7 @@ import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/custom_badge.dart';
 import '../../../../core/widgets/modern_button.dart';
 import '../../../../core/widgets/modern_card.dart';
+import '../../../../models/user_model.dart';
 import '../../logic/auth_provider.dart';
 
 class StaffLoginScreen extends StatefulWidget {
@@ -20,15 +21,15 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> with SingleTickerPr
   late TabController _tabController;
 
   // Faculty form
-  final TextEditingController _teacherIdCtrl = TextEditingController(text: "tch_001");
-  final TextEditingController _teacherPassCtrl = TextEditingController(text: "••••••••");
+  final TextEditingController _teacherEmailCtrl = TextEditingController();
+  final TextEditingController _teacherPassCtrl = TextEditingController();
 
   // Admin form
-  final TextEditingController _adminIdCtrl = TextEditingController(text: "admin@modernclasses.com");
-  final TextEditingController _adminPassCtrl = TextEditingController(text: "••••••••");
-  final TextEditingController _adminPinCtrl = TextEditingController(text: "123456");
+  final TextEditingController _adminEmailCtrl = TextEditingController();
+  final TextEditingController _adminPassCtrl = TextEditingController();
 
-  bool _isLoading = false;
+  bool _obscureTeacherPass = true;
+  bool _obscureAdminPass = true;
 
   @override
   void initState() {
@@ -39,303 +40,274 @@ class _StaffLoginScreenState extends State<StaffLoginScreen> with SingleTickerPr
   @override
   void dispose() {
     _tabController.dispose();
-    _teacherIdCtrl.dispose();
+    _teacherEmailCtrl.dispose();
     _teacherPassCtrl.dispose();
-    _adminIdCtrl.dispose();
+    _adminEmailCtrl.dispose();
     _adminPassCtrl.dispose();
-    _adminPinCtrl.dispose();
     super.dispose();
   }
 
   void _loginFaculty() async {
-    setState(() => _isLoading = true);
+    final email = _teacherEmailCtrl.text.trim();
+    final password = _teacherPassCtrl.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter your faculty email and password.")),
+      );
+      return;
+    }
 
     final auth = context.read<AuthProvider>();
-    final success = await auth.loginTeacher(
-      staffId: _teacherIdCtrl.text.trim(),
-      password: _teacherPassCtrl.text.trim(),
+    final success = await auth.loginStaff(
+      email: email,
+      password: password,
+      expectedRole: UserRole.teacher,
     );
 
     if (!mounted) return;
-    setState(() => _isLoading = false);
 
     if (success) {
       Navigator.of(context).popUntil((route) => route.isFirst);
-    } else if (auth.errorMessage != null) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.errorMessage!)),
+        SnackBar(
+          content: Text(auth.errorMessage ?? "Invalid faculty credentials."),
+          backgroundColor: AppTheme.error,
+        ),
       );
     }
   }
 
   void _loginAdmin() async {
-    final pin = _adminPinCtrl.text.trim();
-    if (pin.isEmpty || pin.length < 4) {
+    final email = _adminEmailCtrl.text.trim();
+    final password = _adminPassCtrl.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter the 6-digit Master Security PIN (123456)")),
+        const SnackBar(content: Text("Please enter your administrator email and password.")),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (!mounted) return;
-
     final auth = context.read<AuthProvider>();
-    final success = auth.loginAdmin(
-      adminId: _adminIdCtrl.text.trim(),
-      securityPin: pin,
+    final success = await auth.loginStaff(
+      email: email,
+      password: password,
+      expectedRole: UserRole.admin,
     );
+
+    if (!mounted) return;
 
     if (success) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid Master PIN. Please enter correct PIN.")),
+        SnackBar(
+          content: Text(auth.errorMessage ?? "Invalid administrator credentials."),
+          backgroundColor: AppTheme.error,
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text("Staff & Management Gateway"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text("Staff & Faculty Portal"),
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                children: [
-                  const AppLogo(size: 64),
-                  const SizedBox(height: 14),
-
-                  // Management Brand Crest
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surfaceCard,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppTheme.border),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.shield_outlined, size: 16, color: AppTheme.primary),
-                        SizedBox(width: 6),
-                        Text(
-                          "Modern Classes Management Console",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Tab Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      indicatorColor: AppTheme.primary,
-                      labelColor: AppTheme.primary,
-                      unselectedLabelColor: AppTheme.textSecondary,
-                      tabs: const [
-                        Tab(
-                          icon: Icon(Icons.cast_for_education, size: 20),
-                          text: "Faculty Login",
-                        ),
-                        Tab(
-                          icon: Icon(Icons.admin_panel_settings, size: 20),
-                          text: "Admin Command",
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Tab Views
-                  SizedBox(
-                    height: 420,
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildFacultyTab(),
-                        _buildAdminTab(),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    "Madhurendra Kumar Yadav • Modern Classes Patna (+91 6209016951)",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
-                  ),
-                ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Center(child: AppLogo(size: 64)),
+              const SizedBox(height: 12),
+              const Text(
+                "Modern Classes Patna",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primary,
+                ),
               ),
-            ),
+              const SizedBox(height: 4),
+              const Text(
+                "Authorized Institutional Access Only",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 24),
+
+              // Tab Bar for Faculty vs Admin
+              Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  labelColor: AppTheme.background,
+                  unselectedLabelColor: AppTheme.textSecondary,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  tabs: const [
+                    Tab(
+                      icon: Icon(Icons.school, size: 18),
+                      text: "Faculty Login",
+                    ),
+                    Tab(
+                      icon: Icon(Icons.admin_panel_settings, size: 18),
+                      text: "Admin Login",
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Tab Content Area
+              SizedBox(
+                height: 380,
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // --- FACULTY TAB ---
+                    ModernCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              CustomBadge(
+                                text: "TEACHER / FACULTY",
+                                variant: BadgeVariant.primary,
+                              ),
+                              Spacer(),
+                              Icon(Icons.verified_user_outlined, size: 18, color: AppTheme.textSecondary),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          const Text("Faculty Email", style: TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _teacherEmailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              hintText: "faculty@modernclasses.com",
+                              prefixIcon: Icon(Icons.email_outlined, size: 20),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text("Password", style: TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _teacherPassCtrl,
+                            obscureText: _obscureTeacherPass,
+                            decoration: InputDecoration(
+                              hintText: "Enter your password",
+                              prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureTeacherPass ? Icons.visibility_off : Icons.visibility,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(() => _obscureTeacherPass = !_obscureTeacherPass),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          ModernButton(
+                            text: "Sign In as Faculty",
+                            isLoading: auth.isLoading,
+                            onPressed: _loginFaculty,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // --- ADMIN TAB ---
+                    ModernCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              CustomBadge(
+                                text: "MASTER ADMINISTRATOR",
+                                variant: BadgeVariant.secondary,
+                              ),
+                              Spacer(),
+                              Icon(Icons.security, size: 18, color: AppTheme.secondary),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          const Text("Admin Email", style: TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _adminEmailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(
+                              hintText: "admin@modernclassespatna.com",
+                              prefixIcon: Icon(Icons.email_outlined, size: 20),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text("Master Password", style: TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _adminPassCtrl,
+                            obscureText: _obscureAdminPass,
+                            decoration: InputDecoration(
+                              hintText: "Enter master admin password",
+                              prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureAdminPass ? Icons.visibility_off : Icons.visibility,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(() => _obscureAdminPass = !_obscureAdminPass),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          ModernButton(
+                            text: "Authenticate as Admin",
+                            isLoading: auth.isLoading,
+                            onPressed: _loginAdmin,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Notice: All staff logins and administrative actions are logged and authenticated via server-side cryptographic tokens.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildFacultyTab() {
-    return ModernCard(
-      padding: const EdgeInsets.all(20),
-      backgroundColor: AppTheme.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Faculty Staff Sign In",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-              CustomBadge(text: "Teaching Faculty", variant: BadgeVariant.secondary),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            "Access assigned batches, upload lecture notes, schedule live YouTube streams and resolve student doubts.",
-            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 20),
-
-          TextField(
-            controller: _teacherIdCtrl,
-            decoration: const InputDecoration(
-              labelText: "Faculty Staff ID",
-              hintText: "e.g. MCP-FAC-01 or tch_001",
-              prefixIcon: Icon(Icons.badge_outlined, size: 20, color: AppTheme.secondaryLight),
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          TextField(
-            controller: _teacherPassCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: "Faculty Password",
-              prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.secondaryLight),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          ModernButton(
-            text: "Sign In as Faculty (Madhurendra Sir)",
-            width: double.infinity,
-            height: 48,
-            isLoading: _isLoading,
-            icon: Icons.cast_for_education,
-            onPressed: _loginFaculty,
-          ),
-          const Spacer(),
-
-          Center(
-            child: TextButton.icon(
-              icon: const Icon(Icons.flash_on, size: 14, color: AppTheme.secondaryLight),
-              label: const Text("1-Tap Demo Faculty Fill", style: TextStyle(fontSize: 11)),
-              onPressed: () {
-                _teacherIdCtrl.text = "tch_001";
-                _loginFaculty();
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAdminTab() {
-    return ModernCard(
-      padding: const EdgeInsets.all(20),
-      backgroundColor: AppTheme.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Executive Admin Suite",
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-              ),
-              CustomBadge(text: "5 Admin Seats Lock", variant: BadgeVariant.purple),
-            ],
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            "Central administration for course pricing, batch management, revenue ledger, student roster, and global push broadcasts.",
-            style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 16),
-
-          TextField(
-            controller: _adminIdCtrl,
-            decoration: const InputDecoration(
-              labelText: "Admin Email / Key",
-              prefixIcon: Icon(Icons.admin_panel_settings, size: 20, color: AppTheme.purple),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          TextField(
-            controller: _adminPassCtrl,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: "Master Password",
-              prefixIcon: Icon(Icons.lock_outline, size: 20, color: AppTheme.purple),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          TextField(
-            controller: _adminPinCtrl,
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            maxLength: 6,
-            decoration: const InputDecoration(
-              labelText: "6-Digit Master Security PIN *",
-              hintText: "123456",
-              counterText: "",
-              prefixIcon: Icon(Icons.pin, size: 20, color: AppTheme.primary),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          ModernButton(
-            text: "Unlock Admin Command Center",
-            width: double.infinity,
-            height: 48,
-            isLoading: _isLoading,
-            icon: Icons.vpn_key_outlined,
-            onPressed: _loginAdmin,
-          ),
-          const Spacer(),
-
-          Center(
-            child: TextButton.icon(
-              icon: const Icon(Icons.flash_on, size: 14, color: AppTheme.purple),
-              label: const Text("1-Tap Demo Admin Unlock (PIN: 123456)", style: TextStyle(fontSize: 11)),
-              onPressed: () {
-                _adminPinCtrl.text = "123456";
-                _loginAdmin();
-              },
-            ),
-          ),
-        ],
       ),
     );
   }
