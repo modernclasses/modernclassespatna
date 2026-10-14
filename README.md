@@ -107,3 +107,4 @@ When filling out the Google Play Developer Console App Content and Store Listing
 - **Privacy Policy URL:** `https://your-domain.com/privacy-policy.html`
 - **App Support URL / Email:** `https://your-domain.com/app-support.html` / `madhurendrayadav06@gmail.com`
 - **Account Deletion URL:** `https://your-domain.com/app-support.html#account-deletion`
+# modernclassespatna
