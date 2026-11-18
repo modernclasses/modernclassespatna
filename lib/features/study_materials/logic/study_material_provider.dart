@@ -1,12 +1,12 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import '../../../../data/mock_data.dart';
 import '../data/models/study_material_model.dart';
 import '../data/repositories/study_material_repository.dart';
 
 class StudyMaterialProvider extends ChangeNotifier {
   final StudyMaterialRepository _repository;
 
-  List<StudyMaterialModel> _materials = List.from(MockData.studyMaterials);
+  List<StudyMaterialModel> _materials = [];
   String _selectedSubject = 'All';
   bool _isLoading = false;
   String? _errorMessage;
@@ -32,7 +32,7 @@ class StudyMaterialProvider extends ChangeNotifier {
   }
 
   StudyMaterialProvider({StudyMaterialRepository? repository})
-      : _repository = repository ?? StudyMaterialRepositoryImpl() {
+    : _repository = repository ?? StudyMaterialRepositoryImpl() {
     fetchMaterials();
   }
 
@@ -43,7 +43,7 @@ class StudyMaterialProvider extends ChangeNotifier {
 
     try {
       final fetched = await _repository.getMaterials();
-      if (fetched.isNotEmpty) _materials = fetched;
+      _materials = fetched;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -70,9 +70,53 @@ class StudyMaterialProvider extends ChangeNotifier {
     }
   }
 
-  void addStudyMaterial(StudyMaterialModel material) {
+  Future<String> uploadMaterialFile({
+    required String courseId,
+    required String fileName,
+    required Uint8List fileBytes,
+  }) async {
+    return await _repository.uploadMaterialFile(
+      courseId: courseId,
+      fileName: fileName,
+      fileBytes: fileBytes,
+    );
+  }
+
+  Future<StudyMaterialModel> addStudyMaterial(
+    StudyMaterialModel material,
+  ) async {
     _materials.insert(0, material);
-    _repository.uploadMaterial(material);
     notifyListeners();
+    try {
+      final saved = await _repository.uploadMaterial(material);
+      final idx = _materials.indexWhere((m) => m.id == material.id);
+      if (idx != -1) {
+        _materials[idx] = saved;
+      }
+      notifyListeners();
+      return saved;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteMaterial(String materialId, {String? fileUrl}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteMaterial(materialId, fileUrl: fileUrl);
+      _materials.removeWhere((m) => m.id == materialId);
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 }

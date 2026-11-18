@@ -11,6 +11,17 @@ class Formatters {
     return _currencyFormat.format(amount);
   }
 
+  static String formatCurrencyWithDecimals(double amount) {
+    if (amount % 1 == 0) {
+      return formatCurrency(amount);
+    }
+    return NumberFormat.currency(
+      locale: 'en_IN',
+      symbol: '₹',
+      decimalDigits: 2,
+    ).format(amount);
+  }
+
   static String formatDate(DateTime date) {
     return DateFormat('dd MMM yyyy').format(date);
   }

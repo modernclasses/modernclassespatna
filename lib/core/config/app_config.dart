@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Application Configuration & Environment Management for Modern Classes Patna.
@@ -10,6 +11,23 @@ class AppConfig {
   static const String appName = "Modern Classes Patna";
   static const String appVersion = "1.0.0";
   static const String appBuildNumber = "1";
+
+  static bool? _testModeOverride;
+
+  /// True when running inside an automated test runner.
+  static bool get isTestMode {
+    if (_testModeOverride != null) return _testModeOverride!;
+    try {
+      return Platform.environment.containsKey('FLUTTER_TEST');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Explicitly override test mode for isolated tests.
+  static void setTestMode(bool? value) {
+    _testModeOverride = value;
+  }
 
   /// Initialize environment configuration.
   static Future<void> initialize() async {
@@ -31,10 +49,7 @@ class AppConfig {
   // Environment: 'development', 'staging', 'production'
   static String get environment =>
       _getEnv('APP_ENV') ??
-      const String.fromEnvironment(
-        'APP_ENV',
-        defaultValue: 'development',
-      );
+      const String.fromEnvironment('APP_ENV', defaultValue: 'development');
 
   // Supabase Configuration
   static String get supabaseUrl =>
@@ -46,9 +61,13 @@ class AppConfig {
 
   static String get supabaseAnonKey =>
       _getEnv('SUPABASE_ANON_KEY') ??
+      const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+
+  static String get passwordResetRedirectUrl =>
+      _getEnv('PASSWORD_RESET_REDIRECT_URL') ??
       const String.fromEnvironment(
-        'SUPABASE_ANON_KEY',
-        defaultValue: '',
+        'PASSWORD_RESET_REDIRECT_URL',
+        defaultValue: 'modernclasses://reset-callback',
       );
 
   // Support Contacts
@@ -75,4 +94,3 @@ class AppConfig {
       supabaseAnonKey.isNotEmpty &&
       !supabaseAnonKey.startsWith('placeholder');
 }
-

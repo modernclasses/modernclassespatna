@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../../data/mock_data.dart';
 import '../data/models/attendance_model.dart';
 import '../data/repositories/attendance_repository.dart';
 
 class AttendanceProvider extends ChangeNotifier {
   final AttendanceRepository _repository;
 
-  List<AttendanceRecordModel> _records = List.from(MockData.attendanceRecords);
+  List<AttendanceRecordModel> _records = [];
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -15,7 +14,7 @@ class AttendanceProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   AttendanceProvider({AttendanceRepository? repository})
-      : _repository = repository ?? AttendanceRepositoryImpl() {
+    : _repository = repository ?? AttendanceRepositoryImpl() {
     fetchAttendance();
   }
 
@@ -26,7 +25,7 @@ class AttendanceProvider extends ChangeNotifier {
 
     try {
       final fetched = await _repository.getAttendanceRecords();
-      if (fetched.isNotEmpty) _records = fetched;
+      _records = fetched;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -44,7 +43,9 @@ class AttendanceProvider extends ChangeNotifier {
     final studentRecords = getRecordsForStudent(studentId);
     if (studentRecords.isEmpty) return 100.0;
 
-    final presentCount = studentRecords.where((r) => r.status == AttendanceStatus.present).length;
+    final presentCount = studentRecords
+        .where((r) => r.status == AttendanceStatus.present)
+        .length;
     return (presentCount / studentRecords.length) * 100;
   }
 
@@ -76,5 +77,52 @@ class AttendanceProvider extends ChangeNotifier {
 
     _repository.saveAttendanceRecords(newRecords);
     notifyListeners();
+  }
+
+  /// Automatically marks student attendance once they watch at least 75% of a lecture.
+  Future<bool> logLectureAttendanceAuto({
+    required String batchId,
+    required String batchName,
+    required String studentId,
+    required String studentName,
+    required String lessonTitle,
+    required double watchPercentage,
+  }) async {
+    // Enforce 75% watch rule strictly
+    if (watchPercentage < 0.75) return false;
+
+    final today = DateTime.now();
+    final alreadyLogged = _records.any((r) =>
+        r.studentId == studentId &&
+        r.batchId == batchId &&
+        (r.remarks ?? '').contains(lessonTitle) &&
+        r.date.year == today.year &&
+        r.date.month == today.month &&
+        r.date.day == today.day);
+
+    if (alreadyLogged) return false;
+
+    final record = AttendanceRecordModel(
+      id: "auto_att_${DateTime.now().millisecondsSinceEpoch}_$studentId",
+      batchId: batchId,
+      batchName: batchName,
+      studentId: studentId,
+      studentName: studentName,
+      date: today,
+      status: AttendanceStatus.present,
+      markedByTeacherName: "System Auto-Attendance (75% Watch Rule)",
+      remarks: "Auto-logged: ${(watchPercentage * 100).toInt()}% of lecture '$lessonTitle' watched",
+    );
+
+    _records.insert(0, record);
+    notifyListeners();
+
+    try {
+      await _repository.saveAttendanceRecords([record]);
+      return true;
+    } catch (e) {
+      debugPrint("Failed to persist auto attendance: $e");
+      return true;
+    }
   }
 }

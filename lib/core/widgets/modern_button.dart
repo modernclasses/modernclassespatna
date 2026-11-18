@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-enum ButtonVariant { primary, secondary, outline, text, danger }
+enum ButtonVariant { primary, secondary, outline, text, danger, saffron }
 
 class ModernButton extends StatelessWidget {
   final String text;
@@ -21,12 +21,13 @@ class ModernButton extends StatelessWidget {
     this.icon,
     this.isLoading = false,
     this.width,
-    this.height = 48,
-    this.borderRadius = 12,
+    this.height = 46,
+    this.borderRadius = 8,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color bg;
     Color fg;
     BorderSide border = BorderSide.none;
@@ -36,18 +37,29 @@ class ModernButton extends StatelessWidget {
         bg = AppTheme.primary;
         fg = Colors.black;
         break;
-      case ButtonVariant.secondary:
-        bg = AppTheme.secondary;
+      case ButtonVariant.saffron:
+        bg = AppColors.primary;
         fg = Colors.white;
+        break;
+      case ButtonVariant.secondary:
+        bg = isDark ? AppColors.darkSurfaceCard : AppColors.surfaceSubtle;
+        fg = isDark ? AppColors.darkTextPrimary : AppColors.deepInk;
+        border = BorderSide(
+          color: isDark ? AppColors.darkBorder : AppColors.border,
+          width: 1,
+        );
         break;
       case ButtonVariant.outline:
         bg = Colors.transparent;
-        fg = AppTheme.textPrimary;
-        border = const BorderSide(color: AppTheme.borderLight, width: 1.5);
+        fg = isDark ? AppColors.darkTextPrimary : AppColors.deepInk;
+        border = BorderSide(
+          color: isDark ? AppColors.darkBorder : AppColors.border,
+          width: 1,
+        );
         break;
       case ButtonVariant.text:
         bg = Colors.transparent;
-        fg = AppTheme.primary;
+        fg = isDark ? AppColors.primaryLight : AppColors.primaryDark;
         break;
       case ButtonVariant.danger:
         bg = AppTheme.error;
@@ -57,28 +69,29 @@ class ModernButton extends StatelessWidget {
 
     final child = isLoading
         ? SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              color: fg,
-            ),
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2.2, color: fg),
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 18, color: fg),
+                Icon(icon, size: 17, color: fg),
                 const SizedBox(width: 8),
               ],
-              Text(
-                text,
-                style: TextStyle(
-                  color: fg,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.2,
+              Flexible(
+                child: Text(
+                  text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.1,
+                  ),
                 ),
               ),
             ],
@@ -89,7 +102,6 @@ class ModernButton extends StatelessWidget {
       height: height,
       child: Material(
         color: bg,
-        borderRadius: BorderRadius.circular(borderRadius),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(borderRadius),
           side: border,

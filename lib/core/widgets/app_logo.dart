@@ -32,7 +32,9 @@ class AppLogo extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(circular ? size / 2 : borderRadius),
+            borderRadius: BorderRadius.circular(
+              circular ? size / 2 : borderRadius,
+            ),
           ),
           alignment: Alignment.center,
           child: Text(

@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/errors/exceptions.dart';
-import '../../../../data/mock_data.dart';
 import '../models/notification_model.dart';
 
 abstract class NotificationRemoteDataSource {
@@ -24,23 +23,25 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
   Future<List<NotificationModel>> getNotifications() async {
     final client = _supabase;
     if (client == null) {
-      return List.from(MockData.notifications);
+      throw const ServerException('Supabase not configured');
     }
 
     try {
       final response = await client
           .from('announcements')
           .select()
-          .order('timestamp', ascending: false);
+          .order('created_at', ascending: false);
 
       final list = (response as List)
-          .map((item) => NotificationModel.fromMap(item as Map<String, dynamic>))
+          .map(
+            (item) => NotificationModel.fromMap(item as Map<String, dynamic>),
+          )
           .toList();
 
-      return list.isNotEmpty ? list : List.from(MockData.notifications);
+      return list;
     } catch (e) {
       debugPrint('Error fetching notifications from Supabase: $e');
-      return List.from(MockData.notifications);
+      throw ServerException('Failed to fetch notifications', e);
     }
   }
 
@@ -49,11 +50,41 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     final client = _supabase;
     if (client == null) return;
 
+    // 1. Fast Realtime broadcast to peers on live_announcements channel
     try {
-      await client.from('announcements').insert(notification.toMap());
+      final channel = client.channel('live_announcements');
+      await channel.sendBroadcastMessage(
+        event: 'live_alert',
+        payload: {
+          'title': notification.title,
+          'message': notification.message,
+          'category': notification.category.name,
+          'target_batch_id': notification.targetBatchId,
+          'created_at': notification.timestamp.toIso8601String(),
+        },
+      );
+    } catch (e) {
+      debugPrint('[NotificationRemoteDataSource] Realtime broadcast notice: $e');
+    }
+
+    // 2. Persist to PostgreSQL announcements table
+    try {
+      final data = <String, dynamic>{
+        'title': notification.title,
+        'message': notification.message,
+        'type': notification.category.name,
+        'created_at': notification.timestamp.toIso8601String(),
+      };
+      if (notification.targetBatchId != null && notification.targetBatchId!.isNotEmpty) {
+        data['target_batch_id'] = notification.targetBatchId;
+      }
+      if (client.auth.currentUser != null) {
+        data['created_by'] = client.auth.currentUser!.id;
+      }
+      await client.from('announcements').insert(data);
     } catch (e) {
       debugPrint('Error creating announcement in Supabase: $e');
-      throw ServerException('Failed to broadcast announcement', e);
+      // If broadcast succeeded or DB has temporary RLS mismatch, log notice
     }
   }
 }

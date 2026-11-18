@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../../data/mock_data.dart';
 import '../data/models/test_model.dart';
 import '../data/repositories/test_repository.dart';
 
 class TestProvider extends ChangeNotifier {
   final TestRepository _repository;
 
-  List<TestModel> _tests = List.from(MockData.tests);
+  List<TestModel> _tests = [];
   final Map<String, TestResultModel> _testResults = {};
   bool _isLoading = false;
   String? _errorMessage;
@@ -28,7 +27,7 @@ class TestProvider extends ChangeNotifier {
   Duration get timeElapsed => _timeElapsed;
 
   TestProvider({TestRepository? repository})
-      : _repository = repository ?? TestRepositoryImpl() {
+    : _repository = repository ?? TestRepositoryImpl() {
     fetchTests();
   }
 
@@ -39,7 +38,7 @@ class TestProvider extends ChangeNotifier {
 
     try {
       final fetched = await _repository.getTests();
-      if (fetched.isNotEmpty) _tests = fetched;
+      _tests = fetched;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -50,6 +49,15 @@ class TestProvider extends ChangeNotifier {
   }
 
   TestResultModel? getResultForTest(String testId) => _testResults[testId];
+
+  Future<TestModel> getTestPaper(String testId) async {
+    try {
+      return await _repository.getTestPaper(testId);
+    } catch (e) {
+      debugPrint('Error loading test paper: $e');
+      rethrow;
+    }
+  }
 
   void startTest(TestModel test) {
     _activeTest = test;
@@ -63,7 +71,9 @@ class TestProvider extends ChangeNotifier {
   }
 
   void jumpToQuestion(int index) {
-    if (_activeTest != null && index >= 0 && index < _activeTest!.questions.length) {
+    if (_activeTest != null &&
+        index >= 0 &&
+        index < _activeTest!.questions.length) {
       _currentQuestionIndex = index;
       notifyListeners();
     }
@@ -72,13 +82,20 @@ class TestProvider extends ChangeNotifier {
   void selectOptionForCurrentQuestion(int optionIndex) {
     if (_activeTest == null) return;
     final currentQ = _activeTest!.questions[_currentQuestionIndex];
-    final currentResp = _currentResponses[currentQ.id] ?? UserQuestionResponse(questionId: currentQ.id);
+    final currentResp =
+        _currentResponses[currentQ.id] ??
+        UserQuestionResponse(questionId: currentQ.id);
 
-    if (currentQ.type == QuestionType.singleChoice || currentQ.type == QuestionType.trueFalse) {
+    final isMulti = currentQ.type == QuestionType.multipleChoice ||
+        (currentQ.type == QuestionType.caseBased && currentQ.correctOptionIndices.length > 1);
+
+    if (currentQ.type == QuestionType.singleChoice ||
+        currentQ.type == QuestionType.trueFalse ||
+        (currentQ.type == QuestionType.caseBased && !isMulti)) {
       _currentResponses[currentQ.id] = currentResp.copyWith(
         selectedOptionIndices: [optionIndex],
       );
-    } else if (currentQ.type == QuestionType.multipleChoice) {
+    } else if (isMulti) {
       final list = List<int>.from(currentResp.selectedOptionIndices);
       if (list.contains(optionIndex)) {
         list.remove(optionIndex);
@@ -92,21 +109,26 @@ class TestProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDescriptiveAnswerForQuestion(String qId, String text) {
+    if (_activeTest == null) return;
+    final currentResp =
+        _currentResponses[qId] ?? UserQuestionResponse(questionId: qId);
+    _currentResponses[qId] = currentResp.copyWith(writtenAnswer: text);
+    notifyListeners();
+  }
+
   void setDescriptiveAnswer(String text) {
     if (_activeTest == null) return;
     final currentQ = _activeTest!.questions[_currentQuestionIndex];
-    final currentResp = _currentResponses[currentQ.id] ?? UserQuestionResponse(questionId: currentQ.id);
-
-    _currentResponses[currentQ.id] = currentResp.copyWith(
-      writtenAnswer: text,
-    );
-    notifyListeners();
+    setDescriptiveAnswerForQuestion(currentQ.id, text);
   }
 
   void toggleMarkForReview() {
     if (_activeTest == null) return;
     final currentQ = _activeTest!.questions[_currentQuestionIndex];
-    final currentResp = _currentResponses[currentQ.id] ?? UserQuestionResponse(questionId: currentQ.id);
+    final currentResp =
+        _currentResponses[currentQ.id] ??
+        UserQuestionResponse(questionId: currentQ.id);
 
     _currentResponses[currentQ.id] = currentResp.copyWith(
       isMarkedForReview: !currentResp.isMarkedForReview,
@@ -124,14 +146,24 @@ class TestProvider extends ChangeNotifier {
   void clearCurrentResponse() {
     if (_activeTest == null) return;
     final currentQ = _activeTest!.questions[_currentQuestionIndex];
-    _currentResponses[currentQ.id] = UserQuestionResponse(questionId: currentQ.id);
+    _currentResponses[currentQ.id] = UserQuestionResponse(
+      questionId: currentQ.id,
+    );
     notifyListeners();
   }
 
-  TestResultModel submitTest({
+  void resetActiveTest() {
+    _activeTest = null;
+    _currentResponses = {};
+    _currentQuestionIndex = 0;
+    _timeElapsed = Duration.zero;
+    notifyListeners();
+  }
+
+  Future<TestResultModel> submitTest({
     required String studentId,
     required String studentName,
-  }) {
+  }) async {
     if (_activeTest == null) {
       throw Exception("No active test to submit");
     }
@@ -144,20 +176,35 @@ class TestProvider extends ChangeNotifier {
 
     for (var q in test.questions) {
       final resp = _currentResponses[q.id];
-      if (resp == null || (resp.selectedOptionIndices.isEmpty && (resp.writtenAnswer == null || resp.writtenAnswer!.trim().isEmpty))) {
+      if (resp == null ||
+          (resp.selectedOptionIndices.isEmpty &&
+              (resp.writtenAnswer == null ||
+                  resp.writtenAnswer!.trim().isEmpty))) {
         unattemptedCount++;
+      } else if (q.type == QuestionType.descriptive ||
+          q.type == QuestionType.shortAnswer ||
+          q.type == QuestionType.longAnswer ||
+          (q.type == QuestionType.caseBased && q.options.isEmpty)) {
+        // Descriptive, short answer, long answer, and text-based case studies are subjective.
+        // They are preserved in answers_json for teacher/faculty review.
+        // They are not penalized with negative marks, and no score is auto-awarded.
       } else {
         bool isCorrect = false;
-        if (q.type == QuestionType.singleChoice || q.type == QuestionType.trueFalse) {
-          if (resp.selectedOptionIndices.isNotEmpty &&
+        if (q.type == QuestionType.singleChoice ||
+            q.type == QuestionType.trueFalse ||
+            (q.type == QuestionType.caseBased && q.correctOptionIndices.length <= 1)) {
+          if (resp.selectedOptionIndices.length == 1 &&
               q.correctOptionIndices.isNotEmpty &&
-              resp.selectedOptionIndices.first == q.correctOptionIndices.first) {
+              resp.selectedOptionIndices.first ==
+                  q.correctOptionIndices.first) {
             isCorrect = true;
           }
-        } else if (q.type == QuestionType.multipleChoice) {
+        } else if (q.type == QuestionType.multipleChoice ||
+            (q.type == QuestionType.caseBased && q.correctOptionIndices.length > 1)) {
           final selected = Set.from(resp.selectedOptionIndices);
           final correct = Set.from(q.correctOptionIndices);
-          if (selected.length == correct.length && selected.containsAll(correct)) {
+          if (selected.length == correct.length &&
+              selected.containsAll(correct)) {
             isCorrect = true;
           }
         }
@@ -167,14 +214,16 @@ class TestProvider extends ChangeNotifier {
           score += q.marks;
         } else {
           incorrectCount++;
-          // Negative marking (1/3rd of marks)
-          score -= (q.marks / 3.0);
+          // Negative marking driven by test configuration
+          score -= (q.marks * test.negativeMarking);
         }
       }
     }
 
     score = score.clamp(0.0, test.totalMarks);
-    final percentage = (score / test.totalMarks) * 100.0;
+    final percentage = test.totalMarks > 0
+        ? (score / test.totalMarks) * 100.0
+        : 0.0;
 
     final result = TestResultModel(
       id: "res_${DateTime.now().millisecondsSinceEpoch}",
@@ -189,30 +238,76 @@ class TestProvider extends ChangeNotifier {
       correctCount: correctCount,
       incorrectCount: incorrectCount,
       unattemptedCount: unattemptedCount,
-      rank: 3,
-      totalParticipants: test.attemptsCount + 1,
-      percentile: percentage >= 80 ? 98.4 : (percentage >= 50 ? 86.2 : 62.1),
+      rank: null,
+      totalParticipants: null,
+      percentile: null,
       totalTimeTaken: _timeElapsed,
       submittedAt: DateTime.now(),
       responses: Map.from(_currentResponses),
     );
 
-    _testResults[test.id] = result;
-    _repository.submitTestResult(result);
-
-    // Reset active test
-    _activeTest = null;
-    _currentResponses = {};
-    _currentQuestionIndex = 0;
-    _timeElapsed = Duration.zero;
-
+    _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
-    return result;
+
+    try {
+      await _repository.submitTestResult(result);
+      _testResults[test.id] = result;
+
+      // Reset active test session only after confirmed persistence
+      _activeTest = null;
+      _currentResponses = {};
+      _currentQuestionIndex = 0;
+      _timeElapsed = Duration.zero;
+      _isLoading = false;
+
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
   }
 
-  void addTest(TestModel test) {
+  Future<void> addTest(TestModel test) async {
     _tests.insert(0, test);
-    _repository.createTest(test);
     notifyListeners();
+    try {
+      await _repository.createTest(test);
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteTest(String testId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.deleteTest(testId);
+      _tests.removeWhere((t) => t.id == testId);
+      _testResults.remove(testId);
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<List<TestResultModel>> getTestSubmissionsForTest(String testId) async {
+    try {
+      return await _repository.getTestSubmissionsForTest(testId);
+    } catch (e) {
+      debugPrint('Error getting test submissions in provider: $e');
+      rethrow;
+    }
   }
 }

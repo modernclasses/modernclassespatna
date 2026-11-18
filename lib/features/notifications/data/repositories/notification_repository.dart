@@ -11,7 +11,8 @@ class NotificationRepositoryImpl implements NotificationRepository {
   final NotificationRemoteDataSource _remoteDataSource;
 
   NotificationRepositoryImpl({NotificationRemoteDataSource? remoteDataSource})
-      : _remoteDataSource = remoteDataSource ?? NotificationRemoteDataSourceImpl();
+    : _remoteDataSource =
+          remoteDataSource ?? NotificationRemoteDataSourceImpl();
 
   @override
   Future<List<NotificationModel>> getNotifications() async {

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../models/user_model.dart';
+import '../../providers/auth_provider.dart';
 import 'app_routes.dart';
 import '../theme/app_theme.dart';
 import '../../models/course_model.dart';
@@ -11,6 +14,7 @@ import '../../screens/auth/portal_gateway_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/student_register_screen.dart';
 import '../../screens/auth/staff_login_screen.dart';
+import '../../screens/auth/deep_link_processing_screen.dart';
 
 import '../../screens/student/student_main_navigation.dart';
 import '../../screens/student/course_detail_screen.dart';
@@ -23,6 +27,7 @@ import '../../screens/student/test_result_screen.dart';
 import '../../screens/student/notifications_screen.dart';
 
 import '../../screens/teacher/teacher_main_navigation.dart';
+import '../../screens/teacher/teacher_broadcast_prototype_screen.dart';
 import '../../screens/admin/admin_main_navigation.dart';
 
 /// Centralized Navigator Route Generator.
@@ -32,25 +37,56 @@ class RouteGenerator {
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case AppRoutes.gateway:
-        return _buildRoute(const PortalGatewayScreen(), settings);
+        return _buildRoute(
+          const PortalGatewayScreen(),
+          settings,
+          requiresAuth: false,
+        );
 
       case AppRoutes.studentLogin:
-        return _buildRoute(const LoginScreen(), settings);
+        return _buildRoute(const LoginScreen(), settings, requiresAuth: false);
 
       case AppRoutes.studentRegister:
-        return _buildRoute(const StudentRegisterScreen(), settings);
+        return _buildRoute(
+          const StudentRegisterScreen(),
+          settings,
+          requiresAuth: false,
+        );
 
       case AppRoutes.staffLogin:
-        return _buildRoute(const StaffLoginScreen(), settings);
+        return _buildRoute(
+          const StaffLoginScreen(),
+          settings,
+          requiresAuth: false,
+        );
 
       case AppRoutes.studentMain:
-        return _buildRoute(const StudentMainNavigation(), settings);
+        return _buildRoute(
+          const StudentMainNavigation(),
+          settings,
+          requiredRole: UserRole.student,
+        );
 
       case AppRoutes.teacherMain:
-        return _buildRoute(const TeacherMainNavigation(), settings);
+        return _buildRoute(
+          const TeacherMainNavigation(),
+          settings,
+          requiredRole: UserRole.teacher,
+        );
+
+      case AppRoutes.teacherBroadcastPrototype:
+        return _buildRoute(
+          const TeacherBroadcastPrototypeScreen(),
+          settings,
+          requiredRole: UserRole.teacher,
+        );
 
       case AppRoutes.adminMain:
-        return _buildRoute(const AdminMainNavigation(), settings);
+        return _buildRoute(
+          const AdminMainNavigation(),
+          settings,
+          requiredRole: UserRole.admin,
+        );
 
       case AppRoutes.notifications:
         return _buildRoute(const NotificationsScreen(), settings);
@@ -92,7 +128,9 @@ class RouteGenerator {
       case AppRoutes.documentReader:
         if (settings.arguments is StudyMaterialModel) {
           return _buildRoute(
-            DocumentReaderScreen(material: settings.arguments as StudyMaterialModel),
+            DocumentReaderScreen(
+              material: settings.arguments as StudyMaterialModel,
+            ),
             settings,
           );
         }
@@ -101,7 +139,9 @@ class RouteGenerator {
       case AppRoutes.liveClassroom:
         if (settings.arguments is LiveClassModel) {
           return _buildRoute(
-            LiveClassroomScreen(liveClass: settings.arguments as LiveClassModel),
+            LiveClassroomScreen(
+              liveClass: settings.arguments as LiveClassModel,
+            ),
             settings,
           );
         }
@@ -130,13 +170,45 @@ class RouteGenerator {
         return _errorRoute('Invalid arguments for Test Result');
 
       default:
+        final name = settings.name;
+        if (name != null) {
+          final uri = Uri.tryParse(name);
+          if (uri != null && uri.queryParameters.containsKey('code')) {
+            final code = uri.queryParameters['code']!;
+            return MaterialPageRoute(
+              builder: (_) => DeepLinkProcessingScreen(code: code),
+              settings: settings,
+            );
+          }
+        }
         return _errorRoute(settings.name);
     }
   }
 
-  static PageRoute _buildRoute(Widget screen, RouteSettings settings) {
+  static PageRoute _buildRoute(
+    Widget screen,
+    RouteSettings settings, {
+    UserRole? requiredRole,
+    bool requiresAuth = true,
+  }) {
     return MaterialPageRoute(
-      builder: (_) => screen,
+      builder: (context) {
+        if (!requiresAuth) {
+          return screen;
+        }
+
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+
+        if (!auth.isAuthenticated) {
+          return const PortalGatewayScreen();
+        }
+
+        if (requiredRole != null && auth.currentUser.role != requiredRole) {
+          return const PortalGatewayScreen();
+        }
+
+        return screen;
+      },
       settings: settings,
     );
   }
@@ -150,11 +222,18 @@ class RouteGenerator {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.warning),
+              const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: AppTheme.warning,
+              ),
               const SizedBox(height: 16),
               Text(
                 'No route defined for: $routeName',
-                style: const TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: AppTheme.textSecondary,
+                ),
               ),
             ],
           ),

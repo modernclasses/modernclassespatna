@@ -36,7 +36,7 @@ BEGIN
     );
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- ------------------------------------------------------------------------------
 -- 2. Sensitive Profile Field Protection Trigger
@@ -44,14 +44,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.protect_profile_fields()
 RETURNS TRIGGER AS $$
+DECLARE
+    caller_role user_role;
 BEGIN
-    -- Prevent direct client role manipulation unless authorized via admin_set_user_role RPC
-    IF (NEW.role IS DISTINCT FROM OLD.role) THEN
-        IF current_setting('app.allow_role_change', TRUE) IS DISTINCT FROM 'true' THEN
-            RAISE EXCEPTION 'Access Denied: The role column cannot be updated directly. Use admin_set_user_role.';
-        END IF;
-    END IF;
-
     -- Prevent modifying primary key
     IF (NEW.id IS DISTINCT FROM OLD.id) THEN
         RAISE EXCEPTION 'Access Denied: The user ID cannot be modified.';
@@ -62,17 +57,27 @@ BEGIN
         RAISE EXCEPTION 'Access Denied: Email cannot be updated via profiles table.';
     END IF;
 
-    -- Prevent non-admins from altering account status
-    IF (NEW.is_active IS DISTINCT FROM OLD.is_active) THEN
-        IF (SELECT role FROM public.profiles WHERE id = auth.uid()) != 'admin' THEN
-            RAISE EXCEPTION 'Access Denied: Only administrators can modify account active status.';
+    -- Evaluate who is making the change
+    IF auth.uid() = NEW.id THEN
+        -- Self-update: Block sensitive fields
+        IF (NEW.role IS DISTINCT FROM OLD.role) THEN
+            RAISE EXCEPTION 'Access Denied: You cannot modify your own role.';
+        END IF;
+        IF (NEW.is_active IS DISTINCT FROM OLD.is_active) THEN
+            RAISE EXCEPTION 'Access Denied: You cannot modify your own active status.';
+        END IF;
+    ELSE
+        -- Admin-update: Verify admin status
+        SELECT role INTO caller_role FROM public.profiles WHERE id = auth.uid();
+        IF caller_role IS DISTINCT FROM 'admin' THEN
+            RAISE EXCEPTION 'Access Denied: Only administrators can modify other profiles.';
         END IF;
     END IF;
 
     NEW.updated_at = TIMEZONE('utc', NOW());
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS trg_protect_profile_fields ON public.profiles;
 CREATE TRIGGER trg_protect_profile_fields
@@ -115,9 +120,7 @@ BEGIN
         RAISE EXCEPTION 'Target user not found.';
     END IF;
 
-    -- 5. Authorize update using session context flag
-    PERFORM set_config('app.allow_role_change', 'true', TRUE);
-
+    -- 5. Perform the update directly. The trigger will see auth.uid() is an admin and allow it.
     UPDATE public.profiles
     SET role = new_role,
         updated_at = TIMEZONE('utc', NOW())
@@ -130,7 +133,10 @@ BEGIN
         'updated_at', TIMEZONE('utc', NOW())
     );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Grant execution to authenticated users (internal checks enforce admin-only logic)
 GRANT EXECUTE ON FUNCTION public.admin_set_user_role(UUID, user_role) TO authenticated;
+
+-- Explicitly revoke execution from public to prevent unauthenticated access
+REVOKE ALL ON FUNCTION public.admin_set_user_role(UUID, user_role) FROM PUBLIC;

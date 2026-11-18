@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/theme/app_typography.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/app_empty_state.dart';
 import '../../core/widgets/custom_badge.dart';
 import '../../core/widgets/modern_card.dart';
 import '../../providers/auth_provider.dart';
@@ -16,30 +18,12 @@ class DoubtsScreen extends StatefulWidget {
 }
 
 class _DoubtsScreenState extends State<DoubtsScreen> {
-  final Map<String, TextEditingController> _replyControllers = {};
-
   @override
-  void dispose() {
-    for (var c in _replyControllers.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  void _postReply(DoubtProvider doubtProvider, AuthProvider auth, String doubtId) {
-    final controller = _replyControllers[doubtId];
-    if (controller == null || controller.text.trim().isEmpty) return;
-
-    doubtProvider.replyToDoubt(
-      doubtId: doubtId,
-      authorId: auth.currentUser.id,
-      authorName: auth.currentUser.name,
-      authorRole: auth.currentUser.role.name.toUpperCase(),
-      message: controller.text.trim(),
-      isOfficialTeacherAnswer: auth.isTeacher || auth.isAdmin,
-    );
-
-    controller.clear();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<DoubtProvider>().fetchDoubts();
+    });
   }
 
   @override
@@ -47,231 +31,260 @@ class _DoubtsScreenState extends State<DoubtsScreen> {
     final auth = context.watch<AuthProvider>();
     final doubtProvider = context.watch<DoubtProvider>();
     final doubts = doubtProvider.getFilteredDoubts(auth.currentUser.id);
-
-    final filters = ['All', 'My Doubts', 'Resolved', 'Unresolved'];
+    final filters = ['All', 'Resolved', 'Unresolved'];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text("Doubts & Discussion Forum"),
+        title: Text(
+          'Academic Doubts & Inquiries',
+          style: TextStyle(
+            color: isDark ? AppColors.darkTextPrimary : AppColors.deepInk,
+          ),
+        ),
+        backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            color: isDark ? AppColors.darkBorder : AppColors.border,
+            height: 1,
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.primary,
+        backgroundColor: AppColors.saffron,
         foregroundColor: Colors.black,
-        icon: const Icon(Icons.help_outline),
-        label: const Text("Ask Doubt", style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 2,
+        icon: const Icon(Icons.help_outline_rounded, size: 20),
+        label: Text(
+          'Ask Doubt',
+          style: AppTypography.button.copyWith(
+            color: AppColors.deepInk,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         onPressed: () {
-          showDialog(
-            context: context,
-            builder: (_) => const AskDoubtDialog(),
-          );
+          showDialog(context: context, builder: (_) => const AskDoubtDialog());
         },
       ),
       body: Column(
         children: [
           // Filter Chips Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            color: AppTheme.surface,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: isDark ? AppColors.darkSurface : AppColors.surface,
             child: Row(
               children: filters.map((f) {
-                final isSelected = f == doubtProvider.selectedFilter;
+                final isSelected =
+                    f == doubtProvider.selectedFilter ||
+                    (f == 'All' && doubtProvider.selectedFilter == 'My Doubts');
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
                     label: Text(f),
                     selected: isSelected,
                     onSelected: (_) => doubtProvider.setFilter(f),
-                    backgroundColor: AppTheme.surfaceLight,
-                    selectedColor: AppTheme.primary,
+                    backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.surfaceMuted,
+                    selectedColor: isDark ? AppColors.primary.withValues(alpha: 0.25) : AppColors.saffronMuted,
                     labelStyle: TextStyle(
-                      color: isSelected ? Colors.black : AppTheme.textSecondary,
+                      color: isSelected
+                          ? (isDark ? AppColors.primaryLight : AppColors.saffronDark)
+                          : (isDark ? AppColors.darkTextSecondary : AppColors.textSecondary),
                       fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                     ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    side: BorderSide(color: isSelected ? AppTheme.primary : AppTheme.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSelected
+                            ? (isDark ? AppColors.primaryLight : AppColors.saffron)
+                            : (isDark ? AppColors.darkBorder : AppColors.border),
+                        width: 1,
+                      ),
+                    ),
+                    showCheckmark: false,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                   ),
                 );
               }).toList(),
             ),
           ),
-          const Divider(height: 1, color: AppTheme.border),
+          Container(height: 1, color: isDark ? AppColors.darkBorder : AppColors.border),
 
           // Doubts List
           Expanded(
             child: doubts.isEmpty
-                ? const Center(
-                    child: Text(
-                      "No doubts found in this filter.",
-                      style: TextStyle(color: AppTheme.textMuted),
-                    ),
+                ? AppEmptyState(
+                    icon: Icons.quiz_outlined,
+                    title: 'No Doubts in This View',
+                    subtitle:
+                        'Ask a question from your enrolled batch to get direct guidance from faculty.',
+                    actionText: 'Ask Your First Doubt',
+                    onAction: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const AskDoubtDialog(),
+                      );
+                    },
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
                     itemCount: doubts.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 16),
+                    separatorBuilder: (_, _) => const SizedBox(height: 14),
                     itemBuilder: (context, index) {
                       final doubt = doubts[index];
-                      _replyControllers.putIfAbsent(doubt.id, () => TextEditingController());
 
                       return ModernCard(
                         padding: const EdgeInsets.all(16),
-                        backgroundColor: AppTheme.surface,
+                        backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.surface,
+                        accentSpineColor: doubt.isResolved
+                            ? AppColors.emerald
+                            : AppColors.amber,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Doubt Header
                             Row(
                               children: [
-                                CustomBadge(text: doubt.subject, variant: BadgeVariant.primary),
+                                CustomBadge(
+                                  text: doubt.subject.toUpperCase(),
+                                  variant: BadgeVariant.primary,
+                                ),
                                 const SizedBox(width: 8),
                                 CustomBadge(
-                                  text: doubt.isResolved ? "RESOLVED" : "PENDING",
-                                  variant: doubt.isResolved ? BadgeVariant.success : BadgeVariant.warning,
+                                  text: doubt.isResolved
+                                      ? 'RESOLVED'
+                                      : 'PENDING REVIEW',
+                                  variant: doubt.isResolved
+                                      ? BadgeVariant.success
+                                      : BadgeVariant.warning,
                                 ),
                                 const Spacer(),
                                 Text(
-                                  Formatters.timeAgo(doubt.askedAt),
-                                  style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                  Formatters.timeAgo(doubt.createdAt),
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.textMuted,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 12),
 
-                            // Topic & Question
-                            Text(
-                              doubt.topic,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.secondaryLight,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
+                            // Question
                             Text(
                               doubt.questionText,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                              style: AppTypography.titleMedium.copyWith(
+                                color: isDark ? AppColors.darkTextPrimary : AppColors.deepInk,
                                 height: 1.4,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text(
-                              "Asked by ${doubt.studentName}",
-                              style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                            ),
-
-                            // Replies Section
-                            if (doubt.replies.isNotEmpty) ...[
-                              const SizedBox(height: 14),
-                              const Divider(color: AppTheme.border),
-                              const SizedBox(height: 10),
-                              const Text(
-                                "Answers & Discussion",
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-                              ),
-                              const SizedBox(height: 8),
-                              for (var rep in doubt.replies) ...[
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: rep.isOfficialTeacherAnswer
-                                        ? AppTheme.primary.withValues(alpha: 0.1)
-                                        : AppTheme.surfaceLight,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: rep.isOfficialTeacherAnswer
-                                          ? AppTheme.primary.withValues(alpha: 0.4)
-                                          : AppTheme.border,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            rep.authorName,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                              color: rep.isOfficialTeacherAnswer ? AppTheme.primary : AppTheme.textPrimary,
-                                            ),
-                                          ),
-                                          if (rep.isOfficialTeacherAnswer) ...[
-                                            const SizedBox(width: 6),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                              decoration: BoxDecoration(
-                                                color: AppTheme.primary,
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                "FACULTY ANSWER",
-                                                style: TextStyle(
-                                                  color: Colors.black,
-                                                  fontWeight: FontWeight.w900,
-                                                  fontSize: 8,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                          const Spacer(),
-                                          Text(
-                                            Formatters.timeAgo(rep.timestamp),
-                                            style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        rep.message,
-                                        style: const TextStyle(fontSize: 13, height: 1.4),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-
-                            // Quick Reply Input Field
-                            const SizedBox(height: 10),
                             Row(
                               children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _replyControllers[doubt.id],
-                                    style: const TextStyle(fontSize: 12),
-                                    decoration: InputDecoration(
-                                      hintText: auth.isTeacher
-                                          ? "Write official teacher solution..."
-                                          : "Contribute an answer / reply...",
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      isDense: true,
-                                      fillColor: AppTheme.surfaceLight,
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: const BorderSide(color: AppTheme.border),
-                                      ),
-                                    ),
-                                  ),
+                                const Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 14,
+                                  color: AppColors.textMuted,
                                 ),
-                                const SizedBox(width: 8),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: auth.isTeacher ? AppTheme.primary : AppTheme.surfaceElevated,
-                                    foregroundColor: auth.isTeacher ? Colors.black : Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    minimumSize: const Size(0, 36),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "Asked by ${doubt.studentName}",
+                                  style: AppTypography.caption.copyWith(
+                                    color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                                    fontSize: 11,
                                   ),
-                                  onPressed: () => _postReply(doubtProvider, auth, doubt.id),
-                                  child: const Text("Reply"),
                                 ),
                               ],
                             ),
+
+                            // Official Faculty Reply Section
+                            if (doubt.facultyReply != null &&
+                                doubt.facultyReply!.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              Container(height: 1, color: isDark ? AppColors.darkBorder : AppColors.border),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppColors.darkSurface : AppColors.warmIvory,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? AppColors.success.withValues(alpha: 0.4)
+                                        : AppColors.emeraldBorder,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: isDark
+                                                ? AppColors.success.withValues(alpha: 0.2)
+                                                : AppColors.emeraldBg,
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.verified_rounded,
+                                            size: 14,
+                                            color: AppColors.emerald,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          doubt.facultyName ??
+                                              'Faculty Response',
+                                          style: AppTypography.subtitle2
+                                              .copyWith(
+                                                color: isDark
+                                                    ? AppColors.darkTextPrimary
+                                                    : AppColors.deepInk,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 12,
+                                              ),
+                                        ),
+                                        if (doubt.resolvedAt != null) ...[
+                                          const Spacer(),
+                                          Text(
+                                            Formatters.timeAgo(
+                                              doubt.resolvedAt!,
+                                            ),
+                                            style: AppTypography.caption
+                                                .copyWith(
+                                                  color: AppColors.textMuted,
+                                                  fontSize: 10,
+                                                ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      doubt.facultyReply!,
+                                      style: AppTypography.bodySmall.copyWith(
+                                        color: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                                        height: 1.45,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );

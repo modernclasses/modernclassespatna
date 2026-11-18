@@ -16,7 +16,7 @@ class CourseModel {
   final double rating;
   final int reviewsCount;
   final List<String> highlights;
-  final List<String> batchIds;
+  final List<String> subjects;
   final bool isFeatured;
   final bool isCrashCourse;
   final String? playProductId;
@@ -35,12 +35,12 @@ class CourseModel {
     required this.totalHours,
     required this.totalTests,
     required this.totalNotes,
-    this.rating = 4.9,
-    this.reviewsCount = 1420,
+    this.rating = 0.0,
+    this.reviewsCount = 0,
     required this.highlights,
-    required this.batchIds,
+    this.subjects = const [],
     this.isFeatured = false,
-    this.isCrashCourse = true,
+    this.isCrashCourse = false,
     this.playProductId,
   });
 
@@ -48,7 +48,24 @@ class CourseModel {
       ? (((originalPrice - price) / originalPrice) * 100).round()
       : 0;
 
-  /// Deserialize from Supabase `public.courses` row.
+  factory CourseModel.mock() => const CourseModel(
+        id: "mock_course",
+        title: "Course Lecture",
+        category: "General",
+        description: "",
+        coverImageUrl: "",
+        price: 0,
+        originalPrice: 0,
+        teacherName: "Faculty Member",
+        teacherId: "",
+        totalLessons: 1,
+        totalHours: 1,
+        totalTests: 0,
+        totalNotes: 0,
+        highlights: [],
+      );
+
+  /// Deserialize from Supabase w_courses_with_stats row.
   factory CourseModel.fromMap(Map<String, dynamic> map) {
     return CourseModel(
       id: map['id']?.toString() ?? '',
@@ -60,25 +77,31 @@ class CourseModel {
       originalPrice: (map['original_price'] as num?)?.toDouble() ?? 0.0,
       teacherName: map['teacher_name'] ?? 'Faculty Member',
       teacherId: map['teacher_id']?.toString() ?? '',
-      totalLessons: (map['total_lessons'] as num?)?.toInt() ?? 0,
-      totalHours: (map['total_hours'] as num?)?.toInt() ?? 0,
-      totalTests: (map['total_tests'] as num?)?.toInt() ?? 0,
+      totalLessons: (map['live_total_lessons'] as num?)?.toInt() ??
+          (map['total_lessons'] as num?)?.toInt() ??
+          0,
+      totalHours: (map['live_total_hours'] as num?)?.toInt() ??
+          (map['total_hours'] as num?)?.toInt() ??
+          0,
+      totalTests: (map['live_total_tests'] as num?)?.toInt() ??
+          (map['total_tests'] as num?)?.toInt() ??
+          0,
       totalNotes: (map['total_notes'] as num?)?.toInt() ?? 0,
-      rating: (map['rating'] as num?)?.toDouble() ?? 4.9,
+      rating: (map['rating'] as num?)?.toDouble() ?? 0.0,
       reviewsCount: (map['reviews_count'] as num?)?.toInt() ?? 0,
       highlights: map['highlights'] != null
           ? List<String>.from(map['highlights'])
           : const [],
-      batchIds: map['batch_ids'] != null
-          ? List<String>.from(map['batch_ids'])
+      subjects: map['subjects'] != null
+          ? List<String>.from(map['subjects'])
           : const [],
       isFeatured: map['is_featured'] ?? false,
-      isCrashCourse: map['is_crash_course'] ?? true,
+      isCrashCourse: map['is_crash_course'] ?? false,
       playProductId: map['play_product_id'],
     );
   }
 
-  /// Serialize to Supabase `public.courses` format.
+  /// Serialize to Supabase public.courses format.
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -97,11 +120,57 @@ class CourseModel {
       'rating': rating,
       'reviews_count': reviewsCount,
       'highlights': highlights,
-      'batch_ids': batchIds,
+      'subjects': subjects,
       'is_featured': isFeatured,
       'is_crash_course': isCrashCourse,
       'play_product_id': playProductId,
     };
+  }
+
+  CourseModel copyWith({
+    String? id,
+    String? title,
+    String? category,
+    String? description,
+    String? coverImageUrl,
+    double? price,
+    double? originalPrice,
+    String? teacherName,
+    String? teacherId,
+    int? totalLessons,
+    int? totalHours,
+    int? totalTests,
+    int? totalNotes,
+    double? rating,
+    int? reviewsCount,
+    List<String>? highlights,
+    List<String>? subjects,
+    bool? isFeatured,
+    bool? isCrashCourse,
+    String? playProductId,
+  }) {
+    return CourseModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      price: price ?? this.price,
+      originalPrice: originalPrice ?? this.originalPrice,
+      teacherName: teacherName ?? this.teacherName,
+      teacherId: teacherId ?? this.teacherId,
+      totalLessons: totalLessons ?? this.totalLessons,
+      totalHours: totalHours ?? this.totalHours,
+      totalTests: totalTests ?? this.totalTests,
+      totalNotes: totalNotes ?? this.totalNotes,
+      rating: rating ?? this.rating,
+      reviewsCount: reviewsCount ?? this.reviewsCount,
+      highlights: highlights ?? this.highlights,
+      subjects: subjects ?? this.subjects,
+      isFeatured: isFeatured ?? this.isFeatured,
+      isCrashCourse: isCrashCourse ?? this.isCrashCourse,
+      playProductId: playProductId ?? this.playProductId,
+    );
   }
 }
 
@@ -115,6 +184,7 @@ class VideoLessonModel {
   final Duration duration;
   final String videoUrl;
   final String? notesPdfUrl;
+  final String? thumbnailUrl;
   final bool isCompleted;
   final double progressPercent; // 0.0 to 1.0
   final DateTime uploadedAt;
@@ -128,6 +198,7 @@ class VideoLessonModel {
     required this.duration,
     required this.videoUrl,
     this.notesPdfUrl,
+    this.thumbnailUrl,
     this.isCompleted = false,
     this.progressPercent = 0.0,
     required this.uploadedAt,
@@ -140,9 +211,12 @@ class VideoLessonModel {
       batchId: map['batch_id']?.toString() ?? '',
       title: map['title'] ?? '',
       chapter: map['chapter'] ?? 'General Chapter',
-      duration: Duration(seconds: (map['duration_seconds'] as num?)?.toInt() ?? 3600),
+      duration: Duration(
+        seconds: (map['duration_seconds'] as num?)?.toInt() ?? 0,
+      ),
       videoUrl: map['video_url'] ?? '',
       notesPdfUrl: map['notes_pdf_url'],
+      thumbnailUrl: map['thumbnail_url'],
       isCompleted: map['is_completed'] ?? false,
       progressPercent: (map['progress_percent'] as num?)?.toDouble() ?? 0.0,
       uploadedAt: map['created_at'] != null
@@ -161,27 +235,36 @@ class VideoLessonModel {
       'duration_seconds': duration.inSeconds,
       'video_url': videoUrl,
       'notes_pdf_url': notesPdfUrl,
+      if (thumbnailUrl != null) 'thumbnail_url': thumbnailUrl,
       'is_completed': isCompleted,
       'progress_percent': progressPercent,
     };
   }
 
   VideoLessonModel copyWith({
+    String? title,
+    String? chapter,
+    Duration? duration,
+    String? videoUrl,
+    String? notesPdfUrl,
+    String? thumbnailUrl,
     bool? isCompleted,
     double? progressPercent,
+    DateTime? uploadedAt,
   }) {
     return VideoLessonModel(
       id: id,
       courseId: courseId,
       batchId: batchId,
-      title: title,
-      chapter: chapter,
-      duration: duration,
-      videoUrl: videoUrl,
-      notesPdfUrl: notesPdfUrl,
+      title: title ?? this.title,
+      chapter: chapter ?? this.chapter,
+      duration: duration ?? this.duration,
+      videoUrl: videoUrl ?? this.videoUrl,
+      notesPdfUrl: notesPdfUrl ?? this.notesPdfUrl,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       isCompleted: isCompleted ?? this.isCompleted,
       progressPercent: progressPercent ?? this.progressPercent,
-      uploadedAt: uploadedAt,
+      uploadedAt: uploadedAt ?? this.uploadedAt,
     );
   }
 }

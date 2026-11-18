@@ -29,8 +29,8 @@ class UserModel {
     this.assignedBatchIds = const [],
     this.joinedDate,
     this.bio,
-    this.targetExam = "BPSC 71st Civil Services",
-    this.medium = "Bilingual (Hindi + English)",
+    this.targetExam = "",
+    this.medium = "",
     this.isActive = true,
   });
 
@@ -59,14 +59,14 @@ class UserModel {
 
     return UserModel(
       id: map['id']?.toString() ?? '',
-      name: map['full_name'] ?? map['name'] ?? 'Student Aspirant',
+      name: map['full_name'] ?? map['name'] ?? '',
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
       role: parsedRole,
       avatarUrl: map['avatar_url'],
       bio: map['bio'],
-      targetExam: map['target_exam'] ?? 'BPSC 71st Civil Services',
-      medium: map['medium'] ?? 'Bilingual (Hindi + English)',
+      targetExam: map['target_exam']?.toString() ?? '',
+      medium: map['medium']?.toString() ?? '',
       isActive: map['is_active'] ?? true,
       joinedDate: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString())

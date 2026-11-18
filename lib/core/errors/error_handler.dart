@@ -27,6 +27,8 @@ class ErrorHandler {
       return const NetworkFailure();
     }
 
-    return ServerFailure(message.isNotEmpty ? message : 'An unexpected error occurred.');
+    return ServerFailure(
+      message.isNotEmpty ? message : 'An unexpected error occurred.',
+    );
   }
 }

@@ -4,15 +4,20 @@ import '../models/doubt_model.dart';
 
 abstract class DoubtRepository {
   Future<List<DoubtModel>> getDoubts();
-  Future<void> postDoubt(DoubtModel doubt);
-  Future<void> replyDoubt(String doubtId, DoubtReplyModel reply);
+  Future<DoubtModel> postDoubt(DoubtModel doubt);
+  Future<DoubtModel> resolveDoubt(
+    String doubtId,
+    String facultyReply,
+    String facultyName,
+    String resolvedBy,
+  );
 }
 
 class DoubtRepositoryImpl implements DoubtRepository {
   final DoubtRemoteDataSource _remoteDataSource;
 
   DoubtRepositoryImpl({DoubtRemoteDataSource? remoteDataSource})
-      : _remoteDataSource = remoteDataSource ?? DoubtRemoteDataSourceImpl();
+    : _remoteDataSource = remoteDataSource ?? DoubtRemoteDataSourceImpl();
 
   @override
   Future<List<DoubtModel>> getDoubts() async {
@@ -24,18 +29,28 @@ class DoubtRepositoryImpl implements DoubtRepository {
   }
 
   @override
-  Future<void> postDoubt(DoubtModel doubt) async {
+  Future<DoubtModel> postDoubt(DoubtModel doubt) async {
     try {
-      await _remoteDataSource.postDoubt(doubt);
+      return await _remoteDataSource.postDoubt(doubt);
     } catch (e) {
       throw ErrorHandler.handle(e);
     }
   }
 
   @override
-  Future<void> replyDoubt(String doubtId, DoubtReplyModel reply) async {
+  Future<DoubtModel> resolveDoubt(
+    String doubtId,
+    String facultyReply,
+    String facultyName,
+    String resolvedBy,
+  ) async {
     try {
-      await _remoteDataSource.replyDoubt(doubtId, reply);
+      return await _remoteDataSource.resolveDoubt(
+        doubtId,
+        facultyReply,
+        facultyName,
+        resolvedBy,
+      );
     } catch (e) {
       throw ErrorHandler.handle(e);
     }

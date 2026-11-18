@@ -4,8 +4,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/custom_badge.dart';
 import '../../core/widgets/modern_card.dart';
 import '../../providers/course_provider.dart';
-import 'mark_attendance_screen.dart';
-import 'schedule_live_class_screen.dart';
+import 'teacher_broadcast_prototype_screen.dart';
 import 'upload_material_screen.dart';
 
 class TeacherBatchesScreen extends StatelessWidget {
@@ -14,13 +13,14 @@ class TeacherBatchesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final courseProvider = context.watch<CourseProvider>();
-    final batches = courseProvider.batches;
+    final batches = courseProvider.batches
+        .where((b) => courseProvider.myAssignedBatchIds.contains(b.id))
+        .toList();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: const Text("My Assigned Batches"),
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(title: const Text("My Assigned Batches")),
       body: ListView.separated(
         padding: const EdgeInsets.all(16),
         itemCount: batches.length,
@@ -31,16 +31,19 @@ class TeacherBatchesScreen extends StatelessWidget {
 
           return ModernCard(
             padding: const EdgeInsets.all(16),
-            backgroundColor: AppTheme.surface,
+            backgroundColor: isDark ? AppColors.darkSurfaceCard : AppTheme.surface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    CustomBadge(text: course?.category ?? "Crash Course", variant: BadgeVariant.primary),
                     CustomBadge(
-                      text: "${batch.totalStudents} / ${batch.maxStudents} Students",
+                      text: course?.category ?? "Crash Course",
+                      variant: BadgeVariant.primary,
+                    ),
+                    CustomBadge(
+                      text: "${batch.totalStudents} Students",
                       variant: BadgeVariant.success,
                     ),
                   ],
@@ -48,54 +51,69 @@ class TeacherBatchesScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   batch.name,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.deepInk,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   "Course: ${course?.title ?? 'General Course'}",
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   "⏰ Schedule: ${batch.timing} • ${batch.medium}",
-                  style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 14),
-                const Divider(color: AppTheme.border),
+                Divider(color: isDark ? AppColors.darkBorder : AppTheme.border),
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.fact_check_outlined, size: 16),
-                        label: const Text("Attendance", style: TextStyle(fontSize: 12)),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.cell_tower_rounded, size: 16),
+                        label: const Text(
+                          "Go Live",
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
                         onPressed: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const MarkAttendanceScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const TeacherBroadcastPrototypeScreen(),
+                            ),
                           );
                         },
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.live_tv, size: 16),
-                        label: const Text("Go Live", style: TextStyle(fontSize: 12)),
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const ScheduleLiveClassScreen()),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.upload_file, size: 16),
-                        label: const Text("Add Notes", style: TextStyle(fontSize: 12)),
+                        label: const Text(
+                          "Upload Notes",
+                          style: TextStyle(fontSize: 12),
+                        ),
                         onPressed: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const UploadMaterialScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const UploadMaterialScreen(),
+                            ),
                           );
                         },
                       ),

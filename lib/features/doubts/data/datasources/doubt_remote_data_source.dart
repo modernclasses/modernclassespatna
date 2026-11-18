@@ -2,13 +2,17 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/errors/exceptions.dart';
-import '../../../../data/mock_data.dart';
 import '../models/doubt_model.dart';
 
 abstract class DoubtRemoteDataSource {
   Future<List<DoubtModel>> getDoubts();
-  Future<void> postDoubt(DoubtModel doubt);
-  Future<void> replyDoubt(String doubtId, DoubtReplyModel reply);
+  Future<DoubtModel> postDoubt(DoubtModel doubt);
+  Future<DoubtModel> resolveDoubt(
+    String doubtId,
+    String facultyReply,
+    String facultyName,
+    String resolvedBy,
+  );
 }
 
 class DoubtRemoteDataSourceImpl implements DoubtRemoteDataSource {
@@ -24,34 +28,35 @@ class DoubtRemoteDataSourceImpl implements DoubtRemoteDataSource {
   @override
   Future<List<DoubtModel>> getDoubts() async {
     final client = _supabase;
-    if (client == null) {
-      return List.from(MockData.doubts);
-    }
+    if (client == null) throw ServerException('Supabase not configured');
 
     try {
       final response = await client
           .from('doubts')
-          .select()
-          .order('asked_at', ascending: false);
+          .select('*, batches(name)')
+          .order('created_at', ascending: false);
 
-      final list = (response as List)
+      return (response as List)
           .map((item) => DoubtModel.fromMap(item as Map<String, dynamic>))
           .toList();
-
-      return list.isNotEmpty ? list : List.from(MockData.doubts);
     } catch (e) {
       debugPrint('Error fetching doubts from Supabase: $e');
-      return List.from(MockData.doubts);
+      throw ServerException('Failed to fetch doubts', e);
     }
   }
 
   @override
-  Future<void> postDoubt(DoubtModel doubt) async {
+  Future<DoubtModel> postDoubt(DoubtModel doubt) async {
     final client = _supabase;
-    if (client == null) return;
+    if (client == null) throw ServerException('Supabase not configured');
 
     try {
-      await client.from('doubts').insert(doubt.toMap());
+      final response = await client
+          .from('doubts')
+          .insert(doubt.toInsertMap())
+          .select('*, batches(name)')
+          .single();
+      return DoubtModel.fromMap(response);
     } catch (e) {
       debugPrint('Error posting doubt in Supabase: $e');
       throw ServerException('Failed to post doubt', e);
@@ -59,23 +64,34 @@ class DoubtRemoteDataSourceImpl implements DoubtRemoteDataSource {
   }
 
   @override
-  Future<void> replyDoubt(String doubtId, DoubtReplyModel reply) async {
+  Future<DoubtModel> resolveDoubt(
+    String doubtId,
+    String facultyReply,
+    String facultyName,
+    String resolvedBy,
+  ) async {
     final client = _supabase;
-    if (client == null) return;
+    if (client == null) {
+      throw const ServerException('Backend service is not configured.');
+    }
 
     try {
-      final doubtDoc = await client.from('doubts').select().eq('id', doubtId).maybeSingle();
-      if (doubtDoc != null) {
-        final existing = DoubtModel.fromMap(doubtDoc);
-        final updatedReplies = List<DoubtReplyModel>.from(existing.replies)..add(reply);
-        await client.from('doubts').update({
-          'replies': updatedReplies.map((r) => r.toMap()).toList(),
-          'is_resolved': reply.isOfficialTeacherAnswer ? true : existing.isResolved,
-        }).eq('id', doubtId);
-      }
+      final response = await client
+          .from('doubts')
+          .update({
+            'faculty_reply': facultyReply,
+            'faculty_name': facultyName,
+            'resolved_by': resolvedBy,
+            'resolved_at': DateTime.now().toIso8601String(),
+            'is_resolved': true,
+          })
+          .eq('id', doubtId)
+          .select('*, batches(name)')
+          .single();
+      return DoubtModel.fromMap(response);
     } catch (e) {
-      debugPrint('Error replying to doubt in Supabase: $e');
-      throw ServerException('Failed to reply to doubt', e);
+      debugPrint('Error resolving doubt in Supabase: $e');
+      throw ServerException('Failed to resolve doubt', e);
     }
   }
 }

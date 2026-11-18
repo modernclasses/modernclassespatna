@@ -4,6 +4,7 @@ import '../../core/widgets/app_scaffold.dart';
 import 'admin_dashboard_screen.dart';
 import 'manage_courses_screen.dart';
 import 'manage_students_screen.dart';
+import 'manage_teachers_screen.dart';
 import 'revenue_reports_screen.dart';
 import 'app_settings_screen.dart';
 
@@ -23,6 +24,7 @@ class _AdminMainNavigationState extends State<AdminMainNavigation> {
       const AdminDashboardScreen(),
       const ManageCoursesScreen(),
       const ManageStudentsScreen(),
+      const ManageTeachersScreen(),
       const RevenueReportsScreen(),
       const AppSettingsScreen(),
     ];
@@ -44,8 +46,13 @@ class _AdminMainNavigationState extends State<AdminMainNavigation> {
         label: "Students",
       ),
       NavigationDestination(
-        icon: Icon(Icons.receipt_long_outlined),
-        selectedIcon: Icon(Icons.receipt_long, color: AppTheme.primary),
+        icon: Icon(Icons.badge_outlined),
+        selectedIcon: Icon(Icons.badge, color: AppTheme.primary),
+        label: "Teachers",
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.attach_money_outlined),
+        selectedIcon: Icon(Icons.attach_money, color: AppTheme.primary),
         label: "Revenue",
       ),
       NavigationDestination(
@@ -63,14 +70,9 @@ class _AdminMainNavigationState extends State<AdminMainNavigation> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        backgroundColor: AppTheme.surface,
-        indicatorColor: AppTheme.primary.withValues(alpha: 0.2),
         destinations: destinations,
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: screens),
     );
   }
 }

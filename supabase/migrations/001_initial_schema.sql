@@ -57,7 +57,7 @@ CREATE TRIGGER on_auth_user_created
 -- 3. Courses Catalog Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.courses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     subtitle TEXT,
     category TEXT NOT NULL, -- e.g., 'BPSC', 'BSSC', 'Railway', '12th Science'
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS public.courses (
 -- 4. Batches Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.batches (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
     name TEXT NOT NULL, -- e.g., 'Morning Target Batch A'
     timing TEXT NOT NULL, -- e.g., '08:00 AM - 10:00 AM'
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS public.batches (
 -- 5. Enrollments Table (Course & Batch Access)
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.enrollments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
     batch_id UUID REFERENCES public.batches(id) ON DELETE SET NULL,
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS public.enrollments (
 -- 6. Video Lessons Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.lessons (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
     batch_id UUID REFERENCES public.batches(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS public.lessons (
 -- 7. Study Materials / PDFs Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.study_materials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
     batch_id UUID REFERENCES public.batches(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS public.study_materials (
 -- 8. Live Classes Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.live_classes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_id UUID NOT NULL REFERENCES public.batches(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     subject TEXT NOT NULL,
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS public.live_classes (
 -- 9. Tests & Questions Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.tests (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
     batch_id UUID REFERENCES public.batches(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS public.tests (
 -- 10. Test Submissions Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.test_submissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     test_id UUID NOT NULL REFERENCES public.tests(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     score NUMERIC(6, 2) NOT NULL DEFAULT 0.00,
@@ -202,7 +202,7 @@ CREATE TABLE IF NOT EXISTS public.test_submissions (
 -- 11. Attendance Register Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.attendance (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_id UUID NOT NULL REFERENCES public.batches(id) ON DELETE CASCADE,
     attendance_date DATE NOT NULL,
     present_student_ids UUID[] NOT NULL DEFAULT '{}',
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS public.attendance (
 -- 12. Doubts Q&A Desk Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.doubts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     student_name TEXT NOT NULL,
     student_phone TEXT,
@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS public.doubts (
 -- 13. Transactions & Invoices Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_number TEXT UNIQUE NOT NULL,
     student_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     student_name TEXT NOT NULL,
@@ -251,7 +251,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 -- 14. Broadcast Announcements Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.announcements (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
     message TEXT NOT NULL,
     type TEXT NOT NULL DEFAULT 'announcement', -- 'announcement', 'live', 'exam', 'fee'

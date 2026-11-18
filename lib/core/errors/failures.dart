@@ -10,15 +10,21 @@ abstract class Failure {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure([super.message = 'A server error occurred. Please try again later.']);
+  const ServerFailure([
+    super.message = 'A server error occurred. Please try again later.',
+  ]);
 }
 
 class AuthFailure extends Failure {
-  const AuthFailure([super.message = 'Authentication failed. Please verify credentials.']);
+  const AuthFailure([
+    super.message = 'Authentication failed. Please verify credentials.',
+  ]);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([super.message = 'No internet connection. Please check your network.']);
+  const NetworkFailure([
+    super.message = 'No internet connection. Please check your network.',
+  ]);
 }
 
 class CacheFailure extends Failure {

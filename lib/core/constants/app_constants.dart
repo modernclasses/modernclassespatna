@@ -10,6 +10,7 @@ class AppConstants {
   static const String bucketStudyMaterials = 'study-materials';
   static const String bucketCourseThumbnails = 'course-thumbnails';
   static const String bucketDoubtAttachments = 'doubt-attachments';
+  static const String bucketLectureVideos = 'lecture-videos';
 
   // Pagination Defaults
   static const int defaultPageSize = 20;

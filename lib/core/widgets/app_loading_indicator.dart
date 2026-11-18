@@ -6,11 +6,7 @@ class AppLoadingIndicator extends StatelessWidget {
   final String? message;
   final double size;
 
-  const AppLoadingIndicator({
-    super.key,
-    this.message,
-    this.size = 36.0,
-  });
+  const AppLoadingIndicator({super.key, this.message, this.size = 36.0});
 
   @override
   Widget build(BuildContext context) {
@@ -28,10 +24,7 @@ class AppLoadingIndicator extends StatelessWidget {
           ),
           if (message != null) ...[
             const SizedBox(height: AppSpacing.md),
-            Text(
-              message!,
-              style: AppTypography.bodyMedium,
-            ),
+            Text(message!, style: AppTypography.bodyMedium),
           ],
         ],
       ),

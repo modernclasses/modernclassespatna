@@ -8,8 +8,26 @@ import '../../models/payment_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
 
-class PaymentHistoryScreen extends StatelessWidget {
+class PaymentHistoryScreen extends StatefulWidget {
   const PaymentHistoryScreen({super.key});
+
+  @override
+  State<PaymentHistoryScreen> createState() => _PaymentHistoryScreenState();
+}
+
+class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (auth.currentUser.id.isNotEmpty) {
+        context.read<CourseProvider>().fetchStudentTransactions(
+          auth.currentUser.id,
+        );
+      }
+    });
+  }
 
   void _showInvoiceDialog(BuildContext context, PaymentTransactionModel txn) {
     showDialog(
@@ -94,7 +112,7 @@ class PaymentHistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final courseProvider = context.watch<CourseProvider>();
-    final transactions = courseProvider.transactions
+    final transactions = courseProvider.studentTransactions
         .where((t) => t.studentId == auth.currentUser.id)
         .toList();
 
@@ -103,89 +121,139 @@ class PaymentHistoryScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text("Payment History & Invoices"),
       ),
-      body: transactions.isEmpty
-          ? const Center(
-              child: Text(
-                "No payment transactions found.",
-                style: TextStyle(color: AppTheme.textMuted),
-              ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: transactions.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final txn = transactions[index];
-                return ModernCard(
-                  padding: const EdgeInsets.all(16),
-                  backgroundColor: AppTheme.surface,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          CustomBadge(text: txn.invoiceNumber, variant: BadgeVariant.primary),
-                          CustomBadge(
-                            text: "PAID",
-                            variant: BadgeVariant.success,
-                          ),
-                        ],
+      body: courseProvider.isLoadingLedger
+          ? const Center(child: CircularProgressIndicator())
+          : courseProvider.ledgerError != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
+                        const SizedBox(height: 12),
+                        Text(
+                          courseProvider.ledgerError!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: AppTheme.error),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => courseProvider.fetchStudentTransactions(auth.currentUser.id),
+                          child: const Text("Retry"),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : transactions.isEmpty
+                  ? const Center(
+                      child: Text(
+                        "No payment transactions found.",
+                        style: TextStyle(color: AppTheme.textMuted),
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        txn.courseTitle,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "${txn.batchName} • ${txn.paymentMethod}",
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(color: AppTheme.border),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: transactions.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final txn = transactions[index];
+                        return ModernCard(
+                          padding: const EdgeInsets.all(16),
+                          backgroundColor: AppTheme.surface,
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                "Date: ${Formatters.formatDateTime(txn.timestamp)}",
-                                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  CustomBadge(text: txn.invoiceNumber, variant: BadgeVariant.primary),
+                                  const CustomBadge(
+                                    text: "PAID",
+                                    variant: BadgeVariant.success,
+                                  ),
+                                ],
                               ),
+                              const SizedBox(height: 10),
                               Text(
-                                "Ref: ${txn.transactionReference}",
-                                style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                                txn.courseTitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "${txn.batchName} • ${txn.paymentMethod}",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(color: AppTheme.border),
+                              const SizedBox(height: 10),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Date: ${Formatters.formatDateTime(txn.timestamp)}",
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                                        ),
+                                        Text(
+                                          "Ref: ${txn.transactionReference}",
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(maxWidth: 120),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerRight,
+                                            child: Text(
+                                              Formatters.formatCurrency(txn.amountPaid),
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w900,
+                                                color: AppTheme.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        IconButton(
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                          icon: const Icon(Icons.receipt_outlined, size: 18, color: AppTheme.primary),
+                                          tooltip: "View Invoice",
+                                          onPressed: () => _showInvoiceDialog(context, txn),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          Row(
-                            children: [
-                              Text(
-                                Formatters.formatCurrency(txn.amountPaid),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              IconButton(
-                                icon: const Icon(Icons.receipt_outlined, size: 18, color: AppTheme.primary),
-                                tooltip: "View Invoice",
-                                onPressed: () => _showInvoiceDialog(context, txn),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+                        );
+                      },
+                    ),
     );
   }
 }

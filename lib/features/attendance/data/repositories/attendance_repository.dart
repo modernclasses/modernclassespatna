@@ -11,7 +11,7 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   final AttendanceRemoteDataSource _remoteDataSource;
 
   AttendanceRepositoryImpl({AttendanceRemoteDataSource? remoteDataSource})
-      : _remoteDataSource = remoteDataSource ?? AttendanceRemoteDataSourceImpl();
+    : _remoteDataSource = remoteDataSource ?? AttendanceRemoteDataSourceImpl();
 
   @override
   Future<List<AttendanceRecordModel>> getAttendanceRecords() async {
@@ -23,7 +23,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }
 
   @override
-  Future<void> saveAttendanceRecords(List<AttendanceRecordModel> records) async {
+  Future<void> saveAttendanceRecords(
+    List<AttendanceRecordModel> records,
+  ) async {
     try {
       await _remoteDataSource.saveAttendanceRecords(records);
     } catch (e) {

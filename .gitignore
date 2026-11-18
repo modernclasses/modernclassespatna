@@ -49,6 +49,8 @@ key.properties
 # Firebase & Google Service Credentials
 google-services.json
 GoogleService-Info.plist
+*firebase-adminsdk*.json
+service_account.json
 
 # Symbolication & Obfuscation
 app.*.symbols
@@ -59,3 +61,21 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+
+# Dependencies & Node
+node_modules/
+
+# Scratch & Temporary Scripts
+/*.py
+/*.js
+/*.ts
+/*.sql
+!supabase/
+/*.json
+!pubspec.yaml
+!package.json
+!package-lock.json
+!tsconfig.json
+/*.txt
+!CMakeLists.txt
+ui_ux_bundle.zip

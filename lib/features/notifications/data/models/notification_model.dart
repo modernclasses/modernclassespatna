@@ -17,6 +17,7 @@ class NotificationModel {
   final bool isRead;
   final String? actionRoute;
   final String? relatedId;
+  final String? targetBatchId;
 
   const NotificationModel({
     required this.id,
@@ -27,11 +28,13 @@ class NotificationModel {
     this.isRead = false,
     this.actionRoute,
     this.relatedId,
+    this.targetBatchId,
   });
 
   factory NotificationModel.fromMap(Map<String, dynamic> map) {
     NotificationCategory parsedCat = NotificationCategory.announcement;
-    switch (map['category']?.toString().toLowerCase()) {
+    final catStr = (map['category'] ?? map['type'])?.toString().toLowerCase();
+    switch (catStr) {
       case 'liveclass':
       case 'live_class':
         parsedCat = NotificationCategory.liveClass;
@@ -57,12 +60,13 @@ class NotificationModel {
       title: map['title'] ?? 'Notice',
       message: map['message'] ?? '',
       category: parsedCat,
-      timestamp: map['timestamp'] != null
-          ? DateTime.tryParse(map['timestamp'].toString()) ?? DateTime.now()
+      timestamp: map['created_at'] != null
+          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
       isRead: map['is_read'] ?? false,
       actionRoute: map['action_route'],
       relatedId: map['related_id'],
+      targetBatchId: map['target_batch_id']?.toString(),
     );
   }
 
@@ -72,16 +76,15 @@ class NotificationModel {
       'title': title,
       'message': message,
       'category': category.name,
-      'timestamp': timestamp.toIso8601String(),
+      'created_at': timestamp.toIso8601String(),
       'is_read': isRead,
       'action_route': actionRoute,
       'related_id': relatedId,
+      'target_batch_id': targetBatchId,
     };
   }
 
-  NotificationModel copyWith({
-    bool? isRead,
-  }) {
+  NotificationModel copyWith({bool? isRead}) {
     return NotificationModel(
       id: id,
       title: title,

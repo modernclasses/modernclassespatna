@@ -23,5 +23,7 @@ class AppRoutes {
 
   // Staff Portals
   static const String teacherMain = '/teacher/main';
+  static const String teacherBroadcastPrototype =
+      '/teacher/broadcast-prototype';
   static const String adminMain = '/admin/main';
 }

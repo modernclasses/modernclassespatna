@@ -2,6 +2,9 @@ enum QuestionType {
   singleChoice,
   multipleChoice,
   trueFalse,
+  shortAnswer,
+  longAnswer,
+  caseBased,
   descriptive,
 }
 
@@ -17,18 +20,22 @@ class QuestionModel {
   final String id;
   final String text;
   final QuestionType type;
+  final String? casePassage;
   final List<String> options; // For MCQ & Multiple Correct
   final List<int> correctOptionIndices; // 0-indexed correct answers
   final String explanation;
+  final String? sampleAnswer;
   final double marks;
 
   const QuestionModel({
     required this.id,
     required this.text,
     required this.type,
+    this.casePassage,
     this.options = const [],
     this.correctOptionIndices = const [],
     required this.explanation,
+    this.sampleAnswer,
     this.marks = 2.0,
   });
 
@@ -43,6 +50,18 @@ class QuestionModel {
       case 'true_false':
         parsedType = QuestionType.trueFalse;
         break;
+      case 'shortanswer':
+      case 'short_answer':
+        parsedType = QuestionType.shortAnswer;
+        break;
+      case 'longanswer':
+      case 'long_answer':
+        parsedType = QuestionType.longAnswer;
+        break;
+      case 'casebased':
+      case 'case_based':
+        parsedType = QuestionType.caseBased;
+        break;
       case 'descriptive':
         parsedType = QuestionType.descriptive;
         break;
@@ -52,15 +71,19 @@ class QuestionModel {
 
     return QuestionModel(
       id: map['id']?.toString() ?? '',
-      text: map['text'] ?? '',
+      text: map['text'] ?? map['question'] ?? '',
       type: parsedType,
+      casePassage: map['case_passage'] ?? map['casePassage'],
       options: map['options'] != null
           ? List<String>.from(map['options'])
           : const [],
       correctOptionIndices: map['correct_option_indices'] != null
           ? List<int>.from(map['correct_option_indices'])
-          : const [],
+          : (map['correctIndex'] != null
+              ? [int.tryParse(map['correctIndex'].toString()) ?? 0]
+              : const []),
       explanation: map['explanation'] ?? '',
+      sampleAnswer: map['sample_answer'] ?? map['sampleAnswer'],
       marks: (map['marks'] as num?)?.toDouble() ?? 2.0,
     );
   }
@@ -70,11 +93,28 @@ class QuestionModel {
       'id': id,
       'text': text,
       'type': type.name,
+      if (casePassage != null) 'case_passage': casePassage,
       'options': options,
       'correct_option_indices': correctOptionIndices,
       'explanation': explanation,
+      if (sampleAnswer != null) 'sample_answer': sampleAnswer,
       'marks': marks,
     };
+  }
+
+  /// Returns a student-safe sanitized copy of this question, stripping answers and explanations.
+  QuestionModel toStudentSafe() {
+    return QuestionModel(
+      id: id,
+      text: text,
+      type: type,
+      casePassage: casePassage,
+      options: options,
+      correctOptionIndices: const [],
+      explanation: '',
+      sampleAnswer: null,
+      marks: marks,
+    );
   }
 }
 
@@ -88,6 +128,7 @@ class TestModel {
   final Duration duration; // e.g. 30 mins
   final double totalMarks;
   final double passingMarks;
+  final double negativeMarking;
   final int totalQuestions;
   final List<QuestionModel> questions;
   final DateTime scheduledDate;
@@ -104,12 +145,13 @@ class TestModel {
     required this.duration,
     required this.totalMarks,
     this.passingMarks = 40.0,
+    this.negativeMarking = 0.0,
     required this.totalQuestions,
     required this.questions,
     required this.scheduledDate,
     this.isLive = true,
     this.allowsRetake = true,
-    this.attemptsCount = 284,
+    this.attemptsCount = 0,
   });
 
   factory TestModel.fromMap(Map<String, dynamic> map) {
@@ -117,6 +159,10 @@ class TestModel {
             ?.map((q) => QuestionModel.fromMap(q as Map<String, dynamic>))
             .toList() ??
         const [];
+
+    final totalMarksVal = (map['total_marks'] as num?)?.toDouble() ?? 100.0;
+    final passingMarksVal = (map['passing_marks'] as num?)?.toDouble() ??
+        (totalMarksVal * 0.4);
 
     return TestModel(
       id: map['id']?.toString() ?? '',
@@ -127,17 +173,42 @@ class TestModel {
       duration: Duration(
         minutes: (map['duration_minutes'] as num?)?.toInt() ?? 30,
       ),
-      totalMarks: (map['total_marks'] as num?)?.toDouble() ?? 100.0,
-      passingMarks: (map['passing_marks'] as num?)?.toDouble() ?? 40.0,
+      totalMarks: totalMarksVal,
+      passingMarks: passingMarksVal,
+      negativeMarking: (map['negative_marking'] as num?)?.toDouble() ?? 0.0,
       totalQuestions: (map['total_questions'] as num?)?.toInt() ?? questionsList.length,
       questions: questionsList,
-      scheduledDate: map['scheduled_date'] != null
-          ? DateTime.tryParse(map['scheduled_date'].toString()) ?? DateTime.now()
+      scheduledDate: map['created_at'] != null
+          ? DateTime.tryParse(map['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      isLive: map['is_live'] ?? true,
+      isLive: map['status'] != null ? map['status'] == 'published' : (map['is_live'] ?? true),
       allowsRetake: map['allows_retake'] ?? true,
       attemptsCount: (map['attempts_count'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  Map<String, dynamic> toDbMap() {
+    final map = <String, dynamic>{
+      'course_id': courseId,
+      'title': title,
+      'category': 'Full Length Mock',
+      'subject': subject,
+      'duration_minutes': duration.inMinutes,
+      'total_marks': totalMarks.toInt(),
+      'negative_marking': negativeMarking,
+      'status': isLive ? 'published' : 'draft',
+      'questions': questions.map((q) => q.toMap()).toList(),
+      'created_at': scheduledDate.toIso8601String(),
+    };
+    if (batchId.isNotEmpty) {
+      map['batch_id'] = batchId;
+    }
+    if (RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(id)) {
+      map['id'] = id;
+    }
+    return map;
   }
 
   Map<String, dynamic> toMap() {
@@ -150,13 +221,35 @@ class TestModel {
       'duration_minutes': duration.inMinutes,
       'total_marks': totalMarks,
       'passing_marks': passingMarks,
+      'negative_marking': negativeMarking,
       'total_questions': totalQuestions,
       'questions': questions.map((q) => q.toMap()).toList(),
-      'scheduled_date': scheduledDate.toIso8601String(),
+      'created_at': scheduledDate.toIso8601String(),
       'is_live': isLive,
       'allows_retake': allowsRetake,
       'attempts_count': attemptsCount,
     };
+  }
+
+  /// Returns a student-safe sanitized copy of this test, with all questions stripped of answers.
+  TestModel toStudentSafe() {
+    return TestModel(
+      id: id,
+      courseId: courseId,
+      batchId: batchId,
+      title: title,
+      subject: subject,
+      duration: duration,
+      totalMarks: totalMarks,
+      passingMarks: passingMarks,
+      negativeMarking: negativeMarking,
+      totalQuestions: totalQuestions,
+      questions: questions.map((q) => q.toStudentSafe()).toList(),
+      scheduledDate: scheduledDate,
+      isLive: isLive,
+      allowsRetake: allowsRetake,
+      attemptsCount: attemptsCount,
+    );
   }
 }
 
@@ -228,9 +321,9 @@ class TestResultModel {
   final int correctCount;
   final int incorrectCount;
   final int unattemptedCount;
-  final int rank;
-  final int totalParticipants;
-  final double percentile;
+  final int? rank;
+  final int? totalParticipants;
+  final double? percentile;
   final Duration totalTimeTaken;
   final DateTime submittedAt;
   final Map<String, UserQuestionResponse> responses;
@@ -248,9 +341,9 @@ class TestResultModel {
     required this.correctCount,
     required this.incorrectCount,
     required this.unattemptedCount,
-    required this.rank,
-    required this.totalParticipants,
-    required this.percentile,
+    this.rank,
+    this.totalParticipants,
+    this.percentile,
     required this.totalTimeTaken,
     required this.submittedAt,
     required this.responses,
@@ -262,23 +355,30 @@ class TestResultModel {
       (k, v) => MapEntry(k, UserQuestionResponse.fromMap(v as Map<String, dynamic>)),
     );
 
+    final scoreVal = (map['score'] as num?)?.toDouble() ?? 0.0;
+    final maxScoreVal = (map['max_score'] ?? map['total_marks'] as num?)?.toDouble() ?? 100.0;
+    final percentageVal = (map['percentage'] as num?)?.toDouble() ??
+        (maxScoreVal > 0 ? (scoreVal / maxScoreVal) * 100.0 : 0.0);
+
     return TestResultModel(
       id: map['id']?.toString() ?? '',
       testId: map['test_id']?.toString() ?? '',
       testTitle: map['test_title'] ?? 'Mock Test',
       studentId: map['student_id']?.toString() ?? '',
       studentName: map['student_name'] ?? 'Student',
-      score: (map['score'] as num?)?.toDouble() ?? 0.0,
-      maxScore: (map['max_score'] as num?)?.toDouble() ?? 100.0,
-      percentage: (map['percentage'] as num?)?.toDouble() ?? 0.0,
+      score: scoreVal,
+      maxScore: maxScoreVal,
+      percentage: percentageVal,
       totalQuestions: (map['total_questions'] as num?)?.toInt() ?? 0,
       correctCount: (map['correct_count'] as num?)?.toInt() ?? 0,
       incorrectCount: (map['incorrect_count'] as num?)?.toInt() ?? 0,
       unattemptedCount: (map['unattempted_count'] as num?)?.toInt() ?? 0,
-      rank: (map['rank'] as num?)?.toInt() ?? 1,
-      totalParticipants: (map['total_participants'] as num?)?.toInt() ?? 1,
-      percentile: (map['percentile'] as num?)?.toDouble() ?? 99.0,
-      totalTimeTaken: Duration(seconds: (map['total_time_taken_seconds'] as num?)?.toInt() ?? 0),
+      rank: (map['rank'] as num?)?.toInt(),
+      totalParticipants: (map['total_participants'] as num?)?.toInt(),
+      percentile: (map['percentile'] as num?)?.toDouble(),
+      totalTimeTaken: Duration(
+        seconds: (map['total_time_taken_seconds'] ?? map['time_taken_seconds'] as num?)?.toInt() ?? 0,
+      ),
       submittedAt: map['submitted_at'] != null
           ? DateTime.tryParse(map['submitted_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -300,12 +400,44 @@ class TestResultModel {
       'correct_count': correctCount,
       'incorrect_count': incorrectCount,
       'unattempted_count': unattemptedCount,
-      'rank': rank,
-      'total_participants': totalParticipants,
-      'percentile': percentile,
+      if (rank != null) 'rank': rank,
+      if (totalParticipants != null) 'total_participants': totalParticipants,
+      if (percentile != null) 'percentile': percentile,
       'total_time_taken_seconds': totalTimeTaken.inSeconds,
       'submitted_at': submittedAt.toIso8601String(),
       'responses': responses.map((k, v) => MapEntry(k, v.toMap())),
     };
+  }
+
+  Map<String, dynamic> toSubmissionJson() {
+    final answers = <String, dynamic>{};
+    responses.forEach((qId, resp) {
+      if (resp.selectedOptionIndices.isNotEmpty) {
+        answers[qId] = resp.selectedOptionIndices.length == 1
+            ? resp.selectedOptionIndices.first
+            : resp.selectedOptionIndices;
+      } else if (resp.writtenAnswer != null && resp.writtenAnswer!.trim().isNotEmpty) {
+        answers[qId] = resp.writtenAnswer!.trim();
+      }
+    });
+
+    final map = <String, dynamic>{
+      'test_id': testId,
+      'student_id': studentId,
+      'score': score,
+      'total_marks': maxScore.toInt(),
+      'correct_count': correctCount,
+      'incorrect_count': incorrectCount,
+      'unattempted_count': unattemptedCount,
+      'time_taken_seconds': totalTimeTaken.inSeconds,
+      'answers_json': answers,
+      'submitted_at': submittedAt.toIso8601String(),
+    };
+    if (RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(id)) {
+      map['id'] = id;
+    }
+    return map;
   }
 }

@@ -28,12 +28,7 @@ lib/
 ├── models/                # Typed data models (User, Course, Batch, Test, Doubt)
 ├── providers/             # State management providers
 ├── screens/               # User interfaces by role (Auth, Student, Teacher, Admin)
-└── main.dart              # Application entrypoint & multi-provider root gate
-```
-
----
-
-## 🚀 Getting Started
+└── main.dart              # Application entrypoin
 
 ### 1. Prerequisites
 - Flutter SDK (v3.24+ recommended)
@@ -56,7 +51,7 @@ flutter run -d chrome
 # OR
 flutter run -d android
 ```
-
+flutter run -d A101BM
 ---
 
 ## 🔐 Security & Secrets

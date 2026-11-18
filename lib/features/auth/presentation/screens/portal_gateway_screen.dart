@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../../providers/organization_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/custom_badge.dart';
@@ -11,127 +13,170 @@ class PortalGatewayScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    OrganizationProvider? org;
+    try {
+      org = context.watch<OrganizationProvider>();
+    } catch (_) {}
+    final instituteName = org?.instituteName ?? "MODERN CLASSES PATNA";
+    final directorName = org?.directorName ?? "Madhurendra Kumar Yadav";
+    final helpline = org?.helplinePhone ?? "+91 6209016951";
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        toolbarHeight: 60,
+        elevation: 0,
+        centerTitle: true,
+        backgroundColor: isDark ? AppColors.darkSurface : AppColors.surface,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppLogo(size: 30, showShadow: false),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                instituteName.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0.8,
+                  color: isDark ? AppColors.darkTextPrimary : AppColors.deepInk,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: isDark ? AppColors.darkBorder : AppColors.border,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
+              constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // App Brand Logo & Crest
-                  const AppLogo(size: 88, showShadow: true),
-                  const SizedBox(height: 18),
-                  const Text(
-                    "MODERN CLASSES PATNA",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     "Digital Learning & Institutional Management Platform",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   CustomBadge(
-                    text: "Director: Madhurendra Kumar Yadav",
+                    text: "Director: $directorName",
                     variant: BadgeVariant.primary,
                   ),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 24),
 
-                  // Portal Selection Cards
-                  const Align(
+                  // Portal Selection Section Header
+                  Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      "Select Your Portal Gateway",
+                      "SELECT YOUR PORTAL GATEWAY",
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // 1. Student Portal
+                  // 1. Student Portal (Primary highlighted gateway)
                   _buildGatewayTile(
                     context: context,
                     title: "Student Learning App",
-                    subtitle: "Attend live classes, watch recordings, take tests & read notes",
+                    subtitle:
+                        "Attend live classes, watch recordings, take tests & read notes",
                     badge: "For Students",
-                    badgeColor: AppTheme.primary,
-                    icon: Icons.school,
-                    iconColor: AppTheme.primary,
+                    badgeColor: AppColors.primaryDark,
+                    badgeBg: AppColors.saffronMuted,
+                    badgeBorder: AppColors.saffronBorder,
+                    icon: Icons.school_outlined,
+                    iconColor: AppColors.primaryDark,
+                    iconBg: AppColors.saffronMuted,
+                    accentSpine: AppColors.primary,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
                     },
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
 
-                  // 2. Faculty Portal
+                  // 2. Faculty & Admin Portal (Unified Staff Gateway)
                   _buildGatewayTile(
                     context: context,
-                    title: "Faculty & Teacher Portal",
-                    subtitle: "Schedule live YouTube streams, upload notes & mark attendance",
-                    badge: "Teaching Staff",
-                    badgeColor: AppTheme.secondaryLight,
-                    icon: Icons.cast_for_education,
-                    iconColor: AppTheme.secondaryLight,
+                    title: "Faculty & Admin Portal",
+                    subtitle:
+                        "Deliver live lectures, publish tests, manage student roster & admin suite",
+                    badge: "Faculty & Administration",
+                    badgeColor: AppColors.secondary,
+                    badgeBg: AppColors.secondaryMuted,
+                    badgeBorder: AppColors.secondaryLight.withValues(
+                      alpha: 0.3,
+                    ),
+                    icon: Icons.admin_panel_settings_outlined,
+                    iconColor: AppColors.secondary,
+                    iconBg: AppColors.secondaryMuted,
+                    accentSpine: AppColors.secondary,
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const StaffLoginScreen(initialTabIndex: 0),
+                          builder: (_) =>
+                              const StaffLoginScreen(initialTabIndex: 0),
                         ),
                       );
                     },
                   ),
-                  const SizedBox(height: 14),
-
-                  // 3. Admin Command Suite
-                  _buildGatewayTile(
-                    context: context,
-                    title: "Admin Command Suite",
-                    subtitle: "Executive center control, student roster, revenue & broadcasts",
-                    badge: "5 Admin Seats Lock",
-                    badgeColor: AppTheme.purple,
-                    icon: Icons.admin_panel_settings,
-                    iconColor: AppTheme.purple,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const StaffLoginScreen(initialTabIndex: 1),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   // Support & Helpline Footer
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.border),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                    child: const Row(
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurfaceCard : AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.border),
+                    ),
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.support_agent, size: 18, color: AppTheme.primary),
-                        SizedBox(width: 8),
-                        Text(
-                          "Official Helpline: +91 6209016951",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        Icon(
+                          Icons.support_agent_rounded,
+                          size: 18,
+                          color: isDark ? AppColors.primaryLight : AppColors.primaryDark,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            "Official Helpline: $helpline",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppColors.darkTextPrimary : AppColors.deepInk,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -151,69 +196,89 @@ class PortalGatewayScreen extends StatelessWidget {
     required String subtitle,
     required String badge,
     required Color badgeColor,
+    required Color badgeBg,
+    required Color badgeBorder,
     required IconData icon,
     required Color iconColor,
+    required Color iconBg,
+    required Color accentSpine,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ModernCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(18),
-      backgroundColor: AppTheme.surface,
+      accentSpineColor: accentSpine,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      backgroundColor: isDark ? AppColors.darkSurfaceCard : AppColors.surface,
+      borderColor: isDark ? AppColors.darkBorder : AppColors.border,
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
+              color: isDark ? accentSpine.withValues(alpha: 0.2) : iconBg,
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: iconColor, size: 26),
+            child: Icon(icon, color: isDark ? AppColors.primaryLight : iconColor, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
-                    Flexible(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
-                        ),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? AppColors.darkTextPrimary : AppColors.deepInk,
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: badgeColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
+                        color: isDark ? badgeColor.withValues(alpha: 0.2) : badgeBg,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: isDark ? badgeColor.withValues(alpha: 0.4) : badgeBorder, width: 0.8),
                       ),
                       child: Text(
                         badge,
                         style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          color: badgeColor,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? AppColors.primaryLight : badgeColor,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                  softWrap: true,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textMuted),
+          Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 12,
+            color: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
+          ),
         ],
       ),
     );
