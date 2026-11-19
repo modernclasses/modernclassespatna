@@ -8,9 +8,12 @@
 
 ---
 
-## 1. Executive Summary & Deliverables Inventory
+## 1. Executive Summary & Account Provisioning Context
 
-This document serves as the complete, authoritative technical handover manual for the Modern Classes Patna educational mobile ecosystem. All requested deliverables, architectural modules, database schemas, and release artifacts have been completed, tested, and pushed to version control.
+All cloud infrastructure, repositories, and developer consoles for **Modern Classes Patna** were set up directly using the **client's email address**. Consequently:
+- **Full ownership already resides with the client.** There is no complex account migration or ownership transfer required between different emails.
+- **What is being transferred:** The offline build assets, cryptographic code-signing keys, complete source code repository, and the master service inventory.
+- **Final Security Step:** The client simply needs to update passwords, confirm billing cards, and terminate any active developer sessions.
 
 ### Delivered Artifacts Summary
 
@@ -40,7 +43,7 @@ flowchart TD
         EdgeFunctions["Deno Edge Functions<br/>(verify_purchase, notifications, etc.)"]
     end
     
-    subgraph ExternalCloudServices["Third-Party Services"]
+    subgraph ExternalCloudServices["Third-Party Services (All on Client's Email)"]
         GooglePlayStore["Google Play Console<br/>In-App Billing API v3"]
         FirebasePlatform["Firebase Console<br/>Cloud Messaging (FCM HTTP v1)"]
         Cloudflare["Cloudflare Stream<br/>Live RTMP & VOD Video Ingest"]
@@ -62,59 +65,71 @@ flowchart TD
 
 ---
 
-## 3. Account Ownership & Decoupling Checklist
+## 3. Master Services Inventory & Security Handover
 
-To ensure a clean, permanent handover, the client must hold primary ownership of all services, and any developer personal accounts must be removed.
+Since all accounts were provisioned under the client's email, the client already has root access. The client must perform the following security steps to take 100% exclusive control:
 
-### 3.1 Service Inventory & Ownership Status
+### 3.1 Service Inventory & Credentials Guide
 
-| Service | Identifier / Account | Action Required by Client | Status |
-| :--- | :--- | :--- | :---: |
-| **GitHub Repository** | `modernclasses/modernclassespatna` | Client organization holds repository. Ensure developer is removed from collaborators/teams. | Transfer Ready |
-| **Supabase Cloud** | Project: `ajwbifguifbzqmpaxvug` | Add client's email as `Owner` in Project Settings -> Team. Remove developer. | Action Required |
-| **Google Play Console** | `com.modernclasses.patna.modern_classes_patna` | Invite client's Google Account as Account Owner / Admin in Users & Permissions. | Action Required |
-| **Firebase Console** | Project: `modern-classes-377d0` | Add client's email as `Owner` in Project Settings -> Users and permissions. | Action Required |
-| **Cloudflare Account** | Stream Account ID | Transfer ownership or update billing details in Cloudflare dashboard. | Action Required |
-| **Google Cloud Platform** | Project: `118106266506` | Project holds Service Account for Play Billing API. Add client as IAM Owner. | Action Required |
+| # | Platform / Service | Identifier / Resource | Registered Email | Client Action Required |
+| :-: | :--- | :--- | :--- | :--- |
+| 1 | **Google Account / Gmail** | Root Google Account | Client's Email | Change Google Account password; select **"Sign out of all other sessions"**; ensure 2FA is set to client's phone. |
+| 2 | **Google Play Console** | Package: `com.modernclasses.patna.modern_classes_patna` | Client's Google Account | Log in to [Play Console](https://play.google.com/console), verify account status, and upload `app-release-v38.aab`. |
+| 3 | **Google Cloud Platform (GCP)** | Project: `118106266506` | Client's Google Account | Used for Google Play Developer API service account credentials. Verify billing method. |
+| 4 | **Firebase Console** | Project: `modern-classes-377d0` | Client's Google Account | Used for Firebase Cloud Messaging (push notifications). Confirm project access. |
+| 5 | **Supabase Cloud** | Project: `ajwbifguifbzqmpaxvug` | Client's Email | Log in to [Supabase](https://supabase.com/dashboard), change password, verify credit card under Organization Billing. |
+| 6 | **GitHub** | `modernclasses/modernclassespatna` | Client's Email (`modernclasses`) | Log in to GitHub, change password, check Settings -> SSH & GPG Keys (delete any old developer keys). |
+| 7 | **Cloudflare** | Cloudflare Stream | Client's Email | Verify active payment method for video streaming bandwidth. |
 
-> [!CAUTION]
-> **Developer Decoupling Protocol:** Once the client verifies administrative access to the services above, the client must remove the developer's personal email, SSH keys, and collaborator access from GitHub, Supabase, Firebase, and Google Play Console. The developer will retain zero access, rights, or liability for these services.
+> [!IMPORTANT]
+> **Client Action Item — Session Revocation:**  
+> Once the client logs into the accounts above, they should update their passwords and choose **"Sign out of all other devices/sessions"**. This guarantees that no previous developer machine retains session cookies or cached tokens.
 
 ---
 
-## 4. Key Management & Release Signing
+## 4. Local Files Delivery (What Needs to be Sent/Backed Up)
 
-### 4.1 Production Keystore Details
+The following files exist on the local project machine and must be preserved by the client:
 
-The Android application is signed using an RSA 2048-bit release keystore. **Keep this file backed up in multiple secure locations.** If this keystore is lost, Google Play will **never** accept updates for this application.
+### 4.1 Production Android App Bundle (`app-release-v38.aab`)
+- **File:** [`app-release-v38.aab`](file:///d:/coaching%20app%20demo/app-release-v38.aab) (Size: 70.2 MB)
+- **Action:** Ready to be uploaded directly into the Google Play Console under **Release -> Production (or Closed Testing)**.
 
-- **Keystore File Location:** [`android/app/upload-keystore.jks`](file:///d:/coaching%20app%20demo/android/app/upload-keystore.jks)
+### 4.2 Cryptographic Signing Keys (CRITICAL)
+- **Keystore File:** [`android/app/upload-keystore.jks`](file:///d:/coaching%20app%20demo/android/app/upload-keystore.jks)
 - **Configuration File:** [`android/key.properties`](file:///d:/coaching%20app%20demo/android/key.properties)
-- **Alias:** Stored inside `android/key.properties` under `keyAlias`
-- **Keystore Passwords:** Stored inside `android/key.properties` under `storePassword` and `keyPassword`
+- **Why this matters:** Google Play permanently binds the application to this keystore certificate. **If this file is lost, the client will never be able to update their app on Google Play.**
+- **Action:** The client must download `upload-keystore.jks` and `key.properties` and save them in multiple secure offline locations (e.g. secure USB drive, encrypted cloud storage).
 
-### 4.2 Building Future Mobile Releases
+---
 
-When building an updated Android App Bundle for Google Play:
-1. Open [`pubspec.yaml`](file:///d:/coaching%20app%20demo/pubspec.yaml) and increment the version (e.g. `version: 1.0.1+39`).
-2. Run the release bundle command in PowerShell:
+## 5. Building Future Releases (Developer Guide for Client's Next Team)
+
+If the client or their future development team needs to build a new version:
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/modernclasses/modernclassespatna.git
+   ```
+2. Ensure Flutter 3.29+ and Android SDK 34+ are installed.
+3. Verify `android/app/upload-keystore.jks` and `android/key.properties` are in place.
+4. Increment version number in [`pubspec.yaml`](file:///d:/coaching%20app%20demo/pubspec.yaml) (e.g. `version: 1.0.1+39`).
+5. Run the release build command:
    ```powershell
    flutter build appbundle --release
    ```
-3. Locate the signed output at `build/app/outputs/bundle/release/app-release.aab`.
-4. Upload the generated `.aab` file to the [Google Play Console](https://play.google.com/console).
+6. The compiled bundle will be output to: `build/app/outputs/bundle/release/app-release.aab`.
 
 ---
 
-## 5. Database Architecture & Operations
+## 6. Database Architecture & Operations
 
-### 5.1 Project Infrastructure
+### 6.1 Database Specifications
 - **Provider:** Supabase (PostgreSQL 15)
 - **Instance URL:** `https://ajwbifguifbzqmpaxvug.supabase.co`
 - **Connection Mode:** Supavisor Connection Pooler (Port 6543 / 5432)
 
-### 5.2 Critical Migration Milestones
-- **Migrations 001–063:** Core data models (profiles, courses, batches, lessons, test papers, submissions, doubts, transactions).
+### 6.2 Migration Ledger (69 Migrations)
+- **Migrations 001–063:** Core models (profiles, courses, batches, lessons, test papers, submissions, doubts, transactions).
 - **Migration 064:** Materialized view `vw_courses_with_stats` and live class recording sync triggers.
 - **Migration 065:** Complete security hardening (prevented PII leakage, restricted test answer sheets, hardened search paths).
 - **Migration 066:** Clean data reset prior to launch (purged mock test records while preserving root admin).
@@ -122,7 +137,7 @@ When building an updated Android App Bundle for Google Play:
 - **Migration 068:** 100% Scholarship / Free coupon architecture (`FREE100`) and remote coupon table validation.
 - **Migration 069:** Zero-amount transaction audit logging and manual collection ledger separation for free coupon redemptions.
 
-### 5.3 Storage Buckets & Policies
+### 6.3 Storage Buckets
 
 | Bucket Name | Visibility | Allowed MIME Types | Max Size | Access Scope |
 | :--- | :---: | :--- | :---: | :--- |
@@ -134,7 +149,7 @@ When building an updated Android App Bundle for Google Play:
 
 ---
 
-## 6. Serverless Edge Functions Directory
+## 7. Serverless Edge Functions Directory
 
 The application relies on 7 deployed Supabase Edge Functions located in [`supabase/functions/`](file:///d:/coaching%20app%20demo/supabase/functions/):
 
@@ -148,33 +163,9 @@ The application relies on 7 deployed Supabase Edge Functions located in [`supaba
 
 ---
 
-## 7. Operational Troubleshooting & Runbook
-
-### Scenario A: Google Play Purchase Verification Fails
-- **Symptom:** Student completes in-app payment, but batch does not unlock immediately.
-- **Resolution:**
-  1. Open Supabase Dashboard -> **Logs** -> **Edge Functions** -> Select `verify_purchase`.
-  2. If the log reports `403 Google API Permission Denied`, check that the Google Cloud Service Account in project `118106266506` has "View Financial Data" and "Manage Orders" permissions in Google Play Console.
-  3. **Immediate Relief:** The Admin can manually enroll the student into the batch via the Admin Dashboard or by inserting a record into `public.enrollments`.
-
-### Scenario B: Live Stream Does Not Display
-- **Symptom:** Live stream player shows a loading spinner or connection error.
-- **Resolution:**
-  1. Verify the teacher's streaming software (e.g. OBS Studio) is broadcasting to the correct RTMPS URL and stream key.
-  2. Verify that `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` in Supabase Edge Function secrets have active video streaming permissions.
-
-### Scenario C: Push Notifications Not Delivered
-- **Symptom:** Students do not receive batch or live class alerts.
-- **Resolution:**
-  1. Verify device notification permissions on the student's Android device.
-  2. Check `public.user_device_tokens` table in Supabase to confirm the student has a registered token.
-  3. Ensure `FCM_SERVICE_ACCOUNT_KEY` secret in Supabase Edge Functions is valid.
-
----
-
 ## 8. Warranty & Support Disclaimer
 
-1. **Delivery Acceptance:** Delivery of the source code, compiled release bundle, and documentation constitutes full and final completion of the development agreement.
+1. **Delivery Acceptance:** Delivery of the source code, compiled release bundle, and documentation constitutes full and final completion of the development engagement.
 2. **As-Is Provision:** All software, configurations, scripts, and documentation are delivered "as-is", having passed all 51 automated regression and contract tests.
 3. **Third-Party Services:** The ongoing availability, rate limits, billing, and uptime of external services (Google Play, Supabase, Firebase, Cloudflare) are governed solely by their respective providers and are the sole responsibility of the client.
 4. **Post-Handoff Support:** Any future feature requests, third-party API deprecation updates, OS platform migrations, or maintenance must be contracted under a separate, newly negotiated written agreement.
