@@ -1129,14 +1129,34 @@ class CourseRemoteDataSourceImpl implements CourseRemoteDataSource {
               .limit(limit);
 
           if (enrollments.isNotEmpty) {
+            // Fetch 100% coupon redemptions to accurately tag free enrollments
+            final Set<String> freeRedemptions = {};
+            try {
+              final redemptions = await client
+                  .from('coupon_redemptions')
+                  .select('student_id, batch_id');
+              for (final r in (redemptions as List)) {
+                final sId = r['student_id']?.toString() ?? '';
+                final bId = r['batch_id']?.toString() ?? '';
+                if (sId.isNotEmpty && bId.isNotEmpty) {
+                  freeRedemptions.add('${sId}_$bId');
+                }
+              }
+            } catch (_) {}
+
             return enrollments.map((row) {
+              final studentId = row['student_id']?.toString() ?? '';
+              final batchId = row['batch_id']?.toString() ?? '';
+              final isFree = freeRedemptions.contains('${studentId}_$batchId');
+
               final batchData = row['batches'] as Map<String, dynamic>? ?? {};
               final courseData =
                   batchData['courses'] as Map<String, dynamic>? ?? {};
               final profileData =
                   row['profiles'] as Map<String, dynamic>? ?? {};
-              final amount =
+              final rawAmount =
                   (batchData['batch_price'] as num?)?.toDouble() ?? 0.0;
+              final amount = isFree ? 0.0 : rawAmount;
               final studentName =
                   profileData['full_name'] as String? ?? 'Enrolled Student';
               final courseTitle = courseData['title'] as String? ??
@@ -1153,25 +1173,25 @@ class CourseRemoteDataSourceImpl implements CourseRemoteDataSource {
 
               return PaymentTransactionModel(
                 id: idStr,
-                invoiceNumber: 'INV-$invSnippet',
-                transactionReference: 'ENR-$refSnippet',
-                studentId: row['student_id']?.toString() ?? '',
+                invoiceNumber: isFree ? 'INV-FREE-$invSnippet' : 'INV-$invSnippet',
+                transactionReference: isFree ? 'COUPON-$refSnippet' : 'ENR-$refSnippet',
+                studentId: studentId,
                 studentName: studentName,
                 courseId: batchData['course_id']?.toString() ?? '',
                 courseTitle: courseTitle,
-                batchId: row['batch_id']?.toString() ?? '',
+                batchId: batchId,
                 batchName: batchData['name']?.toString() ?? 'Batch',
-                originalAmount: amount,
-                discountAmount: 0.0,
+                originalAmount: rawAmount,
+                discountAmount: isFree ? rawAmount : 0.0,
                 amountPaid: amount,
-                paymentMethod: 'Google Play Billing',
+                paymentMethod: isFree ? 'Free Coupon (Scholarship)' : 'Google Play Billing',
                 status: PaymentStatus.success,
                 timestamp: row['enrolled_at'] != null
                     ? DateTime.tryParse(row['enrolled_at'].toString()) ??
                         DateTime.now()
                     : DateTime.now(),
               );
-            }).where((t) => t.amountPaid > 0).toList();
+            }).toList();
           }
         } catch (fbErr) {
           debugPrint(
@@ -1246,16 +1266,37 @@ class CourseRemoteDataSourceImpl implements CourseRemoteDataSource {
         );
       }
 
-      // Tier 2: If transactions table has 0 collections, aggregate active enrollments x batch prices
+      // Tier 2: If transactions table has 0 collections, aggregate active enrollments x batch prices (excluding free coupon redemptions)
       if (fallbackTotal <= 0) {
         try {
           final enrollmentsList = await client
               .from('enrollments')
-              .select('batch_id, batches!inner(batch_price)')
+              .select('student_id, batch_id, batches!inner(batch_price)')
               .eq('status', 'active');
 
           if (enrollmentsList.isNotEmpty) {
+            // Fetch free coupon redemptions to exclude them from cash revenue
+            final Set<String> freeRedemptions = {};
+            try {
+              final redemptions = await client
+                  .from('coupon_redemptions')
+                  .select('student_id, batch_id');
+              for (final r in (redemptions as List)) {
+                final sId = r['student_id']?.toString() ?? '';
+                final bId = r['batch_id']?.toString() ?? '';
+                if (sId.isNotEmpty && bId.isNotEmpty) {
+                  freeRedemptions.add('${sId}_$bId');
+                }
+              }
+            } catch (_) {}
+
             for (final row in enrollmentsList) {
+              final sId = row['student_id']?.toString() ?? '';
+              final bId = row['batch_id']?.toString() ?? '';
+              if (freeRedemptions.contains('${sId}_$bId')) {
+                continue; // Exclude free coupon enrollments
+              }
+
               final batchData = row['batches'];
               if (batchData is Map && batchData['batch_price'] != null) {
                 final price =
@@ -1272,10 +1313,24 @@ class CourseRemoteDataSourceImpl implements CourseRemoteDataSource {
           try {
             final rawEnrollments = await client
                 .from('enrollments')
-                .select('batch_id')
+                .select('student_id, batch_id')
                 .eq('status', 'active');
 
             if (rawEnrollments.isNotEmpty) {
+              final Set<String> freeRedemptions = {};
+              try {
+                final redemptions = await client
+                    .from('coupon_redemptions')
+                    .select('student_id, batch_id');
+                for (final r in (redemptions as List)) {
+                  final sId = r['student_id']?.toString() ?? '';
+                  final bId = r['batch_id']?.toString() ?? '';
+                  if (sId.isNotEmpty && bId.isNotEmpty) {
+                    freeRedemptions.add('${sId}_$bId');
+                  }
+                }
+              } catch (_) {}
+
               final batchIds = rawEnrollments
                   .map((e) => e['batch_id']?.toString())
                   .where((id) => id != null && id.isNotEmpty)
@@ -1295,8 +1350,12 @@ class CourseRemoteDataSourceImpl implements CourseRemoteDataSource {
                 }
 
                 for (final e in rawEnrollments) {
-                  final bId = e['batch_id']?.toString();
-                  if (bId != null && priceMap.containsKey(bId)) {
+                  final sId = e['student_id']?.toString() ?? '';
+                  final bId = e['batch_id']?.toString() ?? '';
+                  if (freeRedemptions.contains('${sId}_$bId')) {
+                    continue; // Exclude free coupon enrollments
+                  }
+                  if (bId.isNotEmpty && priceMap.containsKey(bId)) {
                     fallbackTotal += priceMap[bId]!;
                   }
                 }

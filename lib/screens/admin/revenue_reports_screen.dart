@@ -577,6 +577,7 @@ class _RevenueReportsScreenState extends State<RevenueReportsScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final txn = transactions[index];
+                final isFreeTxn = txn.amountPaid <= 0;
                 return ModernCard(
                   padding: const EdgeInsets.all(14),
                   backgroundColor: AppTheme.surface,
@@ -585,12 +586,12 @@ class _RevenueReportsScreenState extends State<RevenueReportsScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppTheme.success.withValues(alpha: 0.15),
+                          color: (isFreeTxn ? AppColors.purple : AppColors.success).withValues(alpha: 0.15),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.check,
-                          color: AppTheme.success,
+                        child: Icon(
+                          isFreeTxn ? Icons.card_giftcard_rounded : Icons.check,
+                          color: isFreeTxn ? AppColors.purple : AppColors.success,
                           size: 18,
                         ),
                       ),
@@ -633,16 +634,16 @@ class _RevenueReportsScreenState extends State<RevenueReportsScreen> {
                       ),
                       const SizedBox(width: 8),
                       ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 100),
+                        constraints: const BoxConstraints(maxWidth: 105),
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerRight,
                           child: Text(
-                            Formatters.formatCurrencyWithDecimals(txn.amountPaid),
-                            style: const TextStyle(
+                            isFreeTxn ? "FREE (₹0)" : Formatters.formatCurrencyWithDecimals(txn.amountPaid),
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w900,
-                              color: AppTheme.primary,
+                              color: isFreeTxn ? AppTheme.success : AppTheme.primary,
                             ),
                           ),
                         ),
@@ -810,44 +811,68 @@ class _RevenueReportsScreenState extends State<RevenueReportsScreen> {
                               width: 1.5,
                             ),
                           ),
-                          child: SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                            value: is100PercentFree,
-                            activeThumbColor: AppTheme.success,
-                            title: Row(
-                              children: [
-                                Icon(
-                                  Icons.card_giftcard_rounded,
-                                  size: 20,
-                                  color: is100PercentFree ? AppTheme.success : AppTheme.primary,
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  "100% Free / Full Scholarship",
-                                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
-                                ),
-                              ],
-                            ),
-                            subtitle: Text(
-                              is100PercentFree
-                                  ? "Selected course(s) will be completely ₹0 (FREE) for students."
-                                  : "Toggle to grant 100% free enrollment.",
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: is100PercentFree
-                                    ? AppTheme.success
-                                    : (isDark ? AppColors.darkTextSecondary : AppTheme.textSecondary),
-                              ),
-                            ),
-                            onChanged: (val) {
+                          child: InkWell(
+                            onTap: () {
                               setDialogState(() {
-                                is100PercentFree = val;
+                                is100PercentFree = !is100PercentFree;
                                 if (is100PercentFree) {
                                   discountController.text = "100";
                                   minOrderController.text = "0";
                                 }
                               });
                             },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.card_giftcard_rounded,
+                                    size: 22,
+                                    color: is100PercentFree ? AppTheme.success : AppTheme.primary,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "100% Free / Full Scholarship",
+                                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          is100PercentFree
+                                              ? "Selected course(s) will be completely ₹0 (FREE) for students."
+                                              : "Toggle to grant 100% free enrollment.",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: is100PercentFree
+                                                ? AppTheme.success
+                                                : (isDark ? AppColors.darkTextSecondary : AppTheme.textSecondary),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Switch.adaptive(
+                                    value: is100PercentFree,
+                                    activeThumbColor: AppTheme.success,
+                                    activeTrackColor: AppTheme.success.withValues(alpha: 0.5),
+                                    onChanged: (val) {
+                                      setDialogState(() {
+                                        is100PercentFree = val;
+                                        if (is100PercentFree) {
+                                          discountController.text = "100";
+                                          minOrderController.text = "0";
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 14),
